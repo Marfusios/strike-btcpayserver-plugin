@@ -1,0 +1,119 @@
+{
+    "paths": {
+        "/api/v1/stores/{storeId}/payment-methods": {
+            "get": {
+                "tags": [
+                    "Store Payment Methods"
+                ],
+                "summary": "Get store payment methods",
+                "description": "View information about the stores' configured payment methods",
+                "operationId": "StorePaymentMethods_GetStorePaymentMethods",
+                "parameters": [
+                    {
+                        "name": "storeId",
+                        "in": "path",
+                        "required": true,
+                        "description": "The store to fetch",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "enabled",
+                        "in": "query",
+                        "required": false,
+                        "description": "Fetch payment methods that are enabled/disabled only",
+                        "schema": {
+                            "type": "boolean"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "List of payment methods",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/GenericPaymentMethodData"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing authorization",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProblemDetails"
+                                }
+                            }
+                        }
+                    },
+                    "default": {
+                        "description": "Unexpected error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProblemDetails"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "API_Key": [
+                            "btcpay.store.canviewstoresettings"
+                        ],
+                        "Basic": []
+                    }
+                ]
+            }
+        }
+    },
+    "components": {
+        "schemas": {
+            "GenericPaymentMethodData": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                    "enabled": {
+                        "type": "boolean",
+                        "description": "Whether the payment method is enabled"
+                    },
+                    "cryptoCode": {
+                        "type": "string",
+                        "description": "The currency code of the payment method"
+                    },
+                    "data": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "description": "Associated dynamic data based on payment method type.",
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/OnChainPaymentMethodBaseData"
+                            },
+                            {
+                                "$ref": "#/components/schemas/LightningNetworkPaymentMethodBaseData"
+                            },
+                            {
+                                "description": "Any other unofficial payment method data",
+                                "type": "object",
+                                "additionalProperties": true
+                            }
+                        ]
+                    }
+                }
+            }
+        }
+    },
+    "tags": [
+        {
+            "name": "Store Payment Methods",
+            "description": "Store Payment Methods operations"
+        }
+    ]
+}

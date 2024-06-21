@@ -1,0 +1,47 @@
+﻿@model CreateTokenViewModel
+@{
+    Layout = "../Shared/_NavLayout.cshtml";
+    ViewData.SetActivePage(StoreNavPages.Tokens, "Create New Token", Context.GetStoreData()?.Id);
+    ViewBag.HidePublicKey = ViewBag.HidePublicKey ?? false;
+    ViewBag.ShowStores = ViewBag.ShowStores ?? false;
+}
+<div class="row">
+    <div class="col-xxl-constrain col-xl-8">
+        <h3 class="mb-4">@ViewData["Title"]</h3>
+        <form method="post">
+            <div class="form-group">
+                <label asp-for="Label" class="form-label"></label>
+                @if (ViewBag.HidePublicKey)
+                {
+                    <small class="text-muted">optional</small>
+                }
+                <input asp-for="Label" class="form-control" />
+                <span asp-validation-for="Label" class="text-danger"></span>
+            </div>
+            @if (!ViewBag.HidePublicKey)
+            {
+                <div class="form-group">
+                    <label asp-for="PublicKey" class="form-label"></label>
+                    <input asp-for="PublicKey" class="form-control" />
+                    <span asp-validation-for="PublicKey" class="text-danger"></span>
+                    <div class="form-text">Keep empty for server-initiated pairing.</div>
+                </div>
+            }
+            @if (ViewBag.ShowStores)
+            {
+                <div class="form-group">
+                    <label asp-for="Stores" class="form-label"></label>
+                    <select asp-for="StoreId" asp-items="Model.Stores" class="form-select"></select>
+                    <span asp-validation-for="StoreId" class="text-danger"></span>
+                </div>
+            }
+            else
+            {
+                <input type="hidden" asp-for="StoreId" />
+            }
+            <div class="form-group">
+                <input id="RequestPairing" type="submit" value="Request Pairing" class="btn btn-primary" />
+            </div>
+        </form>
+    </div>
+</div>

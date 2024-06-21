@@ -1,0 +1,81 @@
+@inject BTCPayServer.HostedServices.NBXplorerDashboard dashboard;
+@functions {
+    private void Title(string name, string status)
+    {
+        <h5 class="d-flex align-items-center fw-semibold">
+            <span class="me-2 btcpay-status btcpay-status--@status"></span>
+            @name
+        </h5>
+    }
+}
+@foreach (var line in dashboard.GetAll().Where(summary => summary.Network.ShowSyncSummary))
+{
+    @if (line.Status == null)
+    {
+        Title(line.Network.CryptoCode, "disabled");
+        <ul>
+            <li>The node is offline</li>
+            @if (line.Error != null)
+            {
+                <li>Last error: @line.Error</li>
+            }
+        </ul>
+    }
+    else
+    {
+        @if (line.Status.BitcoinStatus == null)
+        {
+            if (line.State == BTCPayServer.HostedServices.NBXplorerState.Synching)
+            {
+                Title(line.Network.CryptoCode, "pending");
+                <ul>
+                    <li>NBXplorer headers height: @line.Status.ChainHeight</li>
+                    <li>The node is starting...</li>
+                </ul>
+            }
+            else
+            {
+                Title(line.Network.CryptoCode, "disabled");
+                <ul>
+                    <li>NBXplorer headers height: @line.Status.ChainHeight</li>
+                    <li>The node is offline</li>
+                    @if (line.Error != null)
+                    {
+                        <li>Last error: @line.Error</li>
+                    }
+                </ul>
+            }
+        }
+        else if (line.Status.BitcoinStatus.IsSynched)
+        {
+            Title(line.Network.CryptoCode, "enabled");
+            <ul>
+                <li>The node is synchronized (Height: @line.Status.BitcoinStatus.Headers)</li>
+                @if (line.Status.BitcoinStatus.IsSynched &&
+                     line.Status.SyncHeight.HasValue &&
+                     line.Status.SyncHeight.Value < line.Status.BitcoinStatus.Headers)
+                {
+                    <li>NBXplorer is synchronizing... (Height: @line.Status.SyncHeight.Value)</li>
+                }
+            </ul>
+        }
+        else
+        {
+            Title(line.Network.CryptoCode, "enabled");
+            <ul>
+                <li>Node headers height: @line.Status.BitcoinStatus.Headers</li>
+                <li>Validated blocks: @line.Status.BitcoinStatus.Blocks</li>
+            </ul>
+        }
+        @if (!line.Status.IsFullySynched && line.Status.BitcoinStatus != null)
+        {
+            var percent = (int)(line.Status.BitcoinStatus.VerificationProgress * 100);
+            <div class="progress mb-3">
+                <div class="progress-bar" role="progressbar" aria-valuenow="@percent"
+                     aria-valuemin="0" aria-valuemax="100" style="width:@(percent)%">
+                    @percent %
+                </div>
+            </div>
+        }
+    }
+}

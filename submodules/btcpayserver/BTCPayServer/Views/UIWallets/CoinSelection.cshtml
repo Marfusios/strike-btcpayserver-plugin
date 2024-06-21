@@ -1,0 +1,248 @@
+@model WalletSendModel
+
+<div class="form-group hide-when-js mt-4">
+    <label asp-for="SelectedInputs" class="form-label"></label>
+    <select multiple="multiple" asp-for="SelectedInputs" class="form-select">
+        @foreach (var input in Model.InputsAvailable)
+        {
+            <option value="@input.Outpoint" class="text-truncate" asp-selected="@(Model.SelectedInputs?.Contains(input.Outpoint)??false)">(@input.Amount) @input.Outpoint</option>
+        }
+    </select>
+</div>
+<div id="coin-selection-app" class="only-for-js mt-4" v-cloak>
+    <div class="d-sm-flex justify-content-between align-items-center">
+        <h5 class="mb-sm-0">Coin selection</h5>
+        <span class="text-muted text-end">
+            <span>{{selectedItems.length}} selected</span>
+            <span v-show="selectedItems.length > 0">({{selectedAmount}} @Model.CryptoCode)</span>
+            <span>/ {{items.length}} total (@Model.CurrentBalance&nbsp;@Model.CryptoCode)</span>
+        </span>
+    </div>
+    <div class="input-group my-3">
+        <input type="text" v-model="filter" class="form-control" placeholder="Filter by transaction id, amount, label, comment.."/>
+        <button type="button" class="btn btn-secondary" title="Clear" v-on:click="filter=''" :disabled="!filter">
+            <span class="fa fa-times"></span>
+        </button>
+    </div>
+    <ul class="list-group list-group-flush mb-3" v-show="filteredItems.length">
+        <li class="list-group-item py-2 cursor-pointer gap-2 align-items-center justify-content-between"
+            v-for="item of filteredItems"
+            :key="item.outpoint"
+            :class="{ 'active': item.selected }"
+            v-on:click="toggleItem($event, item, !item.selected)">
+            <div class="d-flex align-items-start flex-grow-1 gap-2" style="min-width:0">
+                <input class="form-check-input flex-shrink-0"
+                       type="checkbox"
+                       :id="item.outpoint"
+                       :value="item.outpoint"
+                       :checked="item.selected">
+                <a :href="item.link" target="_blank" class="text-truncate flex-grow-1" v-tooltip="item.outpoint">{{item.outpoint}}</a>
+                <div v-if="item.labels" class="d-flex flex-wrap gap-2 flex-fill" style="min-width:20%;max-width:40%;">
+                    <span v-for="label of item.labels"
+                       key="label.text"
+                       class="transaction-label"
+                       data-bs-toggle="tooltip"
+                       v-tooltip="label.tooltip"
+                       :style="styles(label.color)">
+                        {{label.text}}
+                    </span>
+                </div>
+                <span v-if="item.comment" data-bs-toggle="tooltip" v-tooltip="item.comment" class="badge bg-info rounded-pill" style="min-width:2em">
+                    <span class="fa fa-info"></span>
+                </span>
+                <span class="text-muted text-nowrap flex-shrink-0 ms-2">{{item.amount}} @Model.CryptoCode</span>
+                <span :class="{'bg-success' : item.confirmations > 0, 'bg-warning' : item.confirmations <= 0}"
+                      class="badge"
+                      data-bs-toggle="tooltip"
+                      v-tooltip="`${item.confirmations} confirmation${item.confirmations === 1 ? '' : 's'}`">
+                    {{item.confirmations}} <span class="fa fa-cube"></span>
+                </span>
+            </div>
+        </li>
+    </ul>
+    
+    <ul class="pagination" v-show="currentItems.length > pageSize">
+        <li class="page-item" :class="{'disabled' : pageStart == 0}">
+            <a class="page-link" tabindex="-1" href="#" v-on:click="page = page -1">«</a>
+        </li>
+        <li class="page-item disabled">
+            <span class="page-link">
+                Showing {{pageStart+1}}-{{pageEnd}} of {{currentItems.length}}
+            </span>
+        </li>
+        <li class="page-item" :class="{'disabled' : pageEnd>= currentItems.length}">
+            <a class="page-link" href="#" v-on:click="page = page +1">»</a>
+        </li>
+    </ul>
+
+    <div class="btn-group btn-group-sm">
+        <button type="button" :disabled="selectedInputs.length === 0" v-on:click="showSelectedOnly = !showSelectedOnly" class="btn btn-sm btn-secondary">
+            <template v-if="showSelectedOnly">Show all</template>
+            <template v-else>Show selected only</template>
+        </button>
+        <button type="button" :disabled="showSelectedOnly" v-on:click="showUnconfirmedOnly = !showUnconfirmedOnly" class="btn btn-sm btn-secondary" v-if="hasUnconfirmed">
+            <template v-if="showUnconfirmedOnly">Show unconfirmed coins</template>
+            <template v-else>Hide unconfirmed coins</template>
+        </button>
+    </div>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    Vue.directive('tooltip', function(el, binding) {
+        new bootstrap.Tooltip(el, {
+            title: binding.value,
+            placement: binding.arg || "auto",
+            trigger: 'hover'
+        });
+    });
+
+    function roundNumber(number, decimals) {
+        var newnumber = new Number(number + '').toFixed(parseInt(decimals));
+        return parseFloat(newnumber);
+    }
+
+    new Vue({
+        el: '#coin-selection-app',
+        data: {
+            filter: "",
+            items: @Safe.Json(Model.InputsAvailable),
+            selectedInputs: $("#SelectedInputs").val(),
+            page: 0,
+            pageSize: 10,
+            showSelectedOnly: false,
+            showUnconfirmedOnly: false
+        },
+        watch: {
+            filter: function() {
+                this.page = 0;
+                this.handle();
+            },
+            showSelectedOnly: function() {
+                this.handle();
+            },
+            selectedInputs: function() {
+                this.handle();
+            },
+            showUnconfirmedOnly: function() {
+                this.handle();
+            }
+        },
+        computed: {
+            currentItems: function() {
+                return this.showSelectedOnly ? this.selectedItems : this.items.filter(i=> (!this.showUnconfirmedOnly || i.confirmations ));
+            },
+            pageStart: function() {
+                return this.page === 0 ? 0 : this.page * this.pageSize;
+            },
+            pageEnd: function() {
+                var result = this.pageStart + this.pageSize;
+                if (result > this.currentItems.length) {
+                    result = this.currentItems.length;
+                }
+                return result;
+            },
+            hasUnconfirmed: function() {
+                return this.items.filter(i => !i.confirmations).length > 0;
+            },
+            filteredItems: function() {
+                var result = [];
+                if (!this.filter && !this.showUnconfirmedOnly) {
+                    var self = this;
+                    result = this.currentItems.map(function(currentItem) {
+                        return {...currentItem, selected: self.selectedInputs.indexOf(currentItem.outpoint) != -1
+                        }
+                    });
+                } else {
+                    var f = this.filter.toLowerCase();
+                    for (var i = 0; i < this.currentItems.length; i++) {
+                        var currentItem = this.currentItems[i];
+                        if 
+                            (currentItem.outpoint.indexOf(f) != -1 ||
+                                                         currentItem.amount.toString().indexOf(f) != -1 ||
+                                                         (currentItem.comment && currentItem.comment.toLowerCase().indexOf(f) != -1) ||
+                                                         (currentItem.labels && currentItem.labels.filter(function(l) {
+                                                             return l.text.toLowerCase().indexOf(f) != -1 || l.tooltip.toLowerCase().indexOf(f) != -1
+                                                         }).length > 0)) {
+                            result.push({...currentItem, selected: this.selectedInputs.indexOf(currentItem.outpoint) != -1
+                            });
+                        }
+                    }
+                }
+                return result.slice(this.pageStart, this.pageEnd);
+            },
+            selectedItems: function() {
+                var result = [];
+                for (var i = 0; i < this.items.length; i++) {
+                    var currentItem = this.items[i];
+
+                    if (this.selectedInputs.indexOf(currentItem.outpoint) != -1) {
+                        result.push(currentItem);
+                    }
+                }
+                return result;
+            },
+            selectedAmount: function() {
+                var result = 0;
+                for (let i = 0; i < this.selectedItems.length; i++) {
+                    result += this.selectedItems[i].amount;
+                }
+                return roundNumber(result, 12);
+            }
+        },
+        mounted: function() {
+            var self = this;
+            self.selectedInputs = $("#SelectedInputs").val();
+            $(".crypto-balance-link").text(this.selectedAmount);
+            $("#SelectedInputs").on("input change", function() {
+                self.selectedInputs = $("#SelectedInputs").val();
+            });
+        },
+        methods: {
+            handle: function() {
+                if (this.selectedInputs.length == 0) {
+                    this.showSelectedOnly = false;
+                }
+                if (this.currentItems.length < this.pageEnd) {
+                    this.page = 0;
+                }
+            },
+            toggleItem: function(evt, item, toggle) {
+                if (evt.target.tagName == "A") {
+                    return;
+                }
+                var res = $("#SelectedInputs").val();
+                if (toggle) {
+                    res.push(item.outpoint);
+
+                } else {
+                    res.splice(this.selectedInputs.indexOf(item.outpoint), 1);
+                }
+
+                $("select option").each(function() {
+                    var selected = res.indexOf($(this).attr("value")) !== -1;
+                    $(this).attr("selected", selected ? "selected" : null);
+                });
+
+                this.selectedInputs = res;
+                $(".crypto-balance-link").text(this.selectedAmount);
+            },
+            styles: function (bgColor) {
+                let color = 'inherit'
+                if (bgColor.slice(0, 1) === '#') {
+                    const hex = bgColor.slice(1);
+                    // Convert to RGB value
+                    const r = parseInt(hex.substr(0,2), 16);
+                    const g = parseInt(hex.substr(2,2), 16);
+                    const b = parseInt(hex.substr(4,2), 16);
+                    // Get YIQ ratio
+                    const yiq = ((r * 299) + (g * 587) + (b * 114)) / 1000;
+                    // Check contrast
+                    color = (yiq >= 128) ? 'black' : 'white';
+                }
+                return { '--label-bg': bgColor, '--label-fg': color }
+            }
+        }
+    });
+});
+</script>

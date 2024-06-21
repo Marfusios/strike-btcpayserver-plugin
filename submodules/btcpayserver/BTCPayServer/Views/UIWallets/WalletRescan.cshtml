@@ -1,0 +1,106 @@
+﻿@model RescanWalletModel
+@{
+    var walletId = Context.GetRouteValue("walletId").ToString();
+    Layout = "../Shared/_NavLayout.cshtml";
+    ViewData.SetActivePage(WalletsNavPages.Settings, "Rescan Wallet", walletId);
+}
+
+<h3 class="mb-3">@ViewData["Title"]</h3>
+
+@if (!Model.Ok)
+{
+    <div class="row">
+        <div class="col-lg-8">
+            <p>This feature is disabled</p>
+            @if (Model.IsFullySync)
+            {
+                <p><span class="text-success fa fa-check-circle"></span> <span>The full node is synched</span></p>
+            }
+            else
+            {
+                <p><span class="text-danger fa fa-times-circle"></span> <span>The full node is not synched</span></p>
+            }
+            @if (Model.IsServerAdmin)
+            {
+                <p><span class="text-success fa fa-check-circle"></span> <span>You are server administrator</span></p>
+            }
+            else
+            {
+                <p><span class="text-danger fa fa-times-circle"></span> <span>You are not server administrator</span></p>
+            }
+            @if (Model.IsSupportedByCurrency)
+            {
+                <p><span class="text-success fa fa-check-circle"></span> <span>This full node support rescan of the UTXO set</span></p>
+            }
+            else
+            {
+                <p><span class="text-danger fa fa-times-circle"></span> <span>This full node does not support rescan of the UTXO set</span></p>
+            }
+        </div>
+    </div>
+}
+else if (!Model.Progress.HasValue)
+{
+    <div class="row">
+        @if (Model.PreviousError != null)
+        {
+            <div class="alert alert-danger alert-dismissible" role="alert">
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close">
+                    <vc:icon symbol="close" />
+                </button>
+                <span>The previous scan stopped with an error: @Model.PreviousError</span>
+            </div>
+        }
+        else if (Model.LastSuccess != null)
+        {
+            <div class="alert alert-success alert-dismissible" role="alert">
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close">
+                    <vc:icon symbol="close" />
+                </button>
+                <span>The previous scan completed and found <b>@Model.LastSuccess.Found</b> UTXOs in <b>@Model.TimeOfScan</b> (The total UTXO set size is @Model.LastSuccess.TotalSizeOfUTXOSet.Value)</span>
+            </div>
+        }
+        <div class="col-lg-8">
+            <p>
+                Scanning the UTXO set allow you to restore the balance of your wallet, but not all the transaction history.
+                This operation will scan the HD Path <b>0/*</b>, <b>1/*</b> and <b>*</b> from a starting index, until no UTXO are found in a whole gap limit.
+            </p>
+            <p>The batch size make sure the scan do not consume too much RAM at once by rescanning several time with smaller subset of addresses.</p>
+            <p>If you do not understand the above, go with the defaults and start scanning.</p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <form method="post">
+                <div class="form-group">
+                    <label asp-for="StartingIndex" class="form-label"></label>
+                    <input asp-for="StartingIndex" class="form-control" type="number" style="max-width:14ch;" />
+                </div>
+                <div class="form-group">
+                    <label asp-for="GapLimit" class="form-label"></label>
+                    <input asp-for="GapLimit" class="form-control" type="number" step="1000" style="max-width:14ch;" />
+                </div>
+                <div class="form-group">
+                    <label asp-for="BatchSize" class="form-label"></label>
+                    <input asp-for="BatchSize" class="form-control" type="number" step="1000" style="max-width:14ch;" />
+                </div>
+                <button type="submit" class="btn btn-primary mt-2">Start scan</button>
+            </form>
+        </div>
+    </div>
+}
+else
+{
+    <div class="row">
+        <div class="col-lg-8">
+            <p>Scanning in progress, refresh the page to see the progress... (Estimated time: @Model.RemainingTime)</p>
+            <div class="progress">
+                <div class="progress-bar" role="progressbar" aria-valuenow="@(Model.Progress.Value)"
+                     aria-valuemin="0" aria-valuemax="100" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width:@(Model.Progress.Value)%;">
+                    @(Model.Progress.Value)% (estimated time: @Model.RemainingTime)
+                </div>
+            </div>
+        </div>
+    </div>
+}

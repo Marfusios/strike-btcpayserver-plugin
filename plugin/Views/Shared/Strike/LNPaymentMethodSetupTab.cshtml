@@ -1,0 +1,53 @@
+﻿@model BTCPayServer.Models.StoreViewModels.LightningNodeViewModel
+@{
+    var storeId = Model.StoreId;
+    if (Model.CryptoCode != "BTC")
+    {
+        return;
+    }
+}
+
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+       
+       const customNodeAccordian = document.getElementById("CustomNodeSupport");
+       const template = document.getElementById("strike");
+       customNodeAccordian.appendChild(template.content.cloneNode(true));
+        
+    });
+</script>
+
+<template id="strike">
+    <div class="accordion-item">
+        <h2 class="accordion-header" id="CustomStrikeHeader">
+            <button type="button" class="accordion-button collapsed" data-bs-toggle="collapse" data-bs-target="#CustomStrikeContent" aria-controls="CustomStrikeContent" aria-expanded="false">
+                <span><strong>Strike</strong> via REST API</span>
+                <vc:icon symbol="caret-down"/>
+            </button>
+        </h2>
+        <div id="CustomStrikeContent" class="accordion-collapse collapse" aria-labelledby="CustomStrikeHeader" data-bs-parent="#CustomNodeSupport">
+            <div class="accordion-body">
+                <ul class="pb-2">
+                    <li>
+                        <code><b>type=</b>strike;<b>environment=</b>live;<b>currency=</b>FIAT;<b>api-key</b>=xxx...</code>
+                    </li>
+                </ul>
+                <p class="my-2">
+                    <div style="display: flex; flex-direction: column">
+                        <span>
+                            The <strong>environment</strong> should be set to <code>live</code> or <code>development</code>.
+                        </span>
+                        <span>
+                            The <strong>currency</strong> can be either <code>BTC</code> or <code>FIAT</code> (to automatically convert receiving payments into cash).
+                        </span>
+                        <span>
+                            Visit 
+                            <a href="https://dashboard.strike.me" target="_blank" rel="noreferrer noopener">Strike live dashboard</a> or
+                            <a href="https://dev.dashboard.strike.me" target="_blank" rel="noreferrer noopener">Strike development dashboard</a> to obtain your API key. 
+                        </span>
+                    </div>
+                </p>
+            </div>
+        </div>
+    </div>
+</template>

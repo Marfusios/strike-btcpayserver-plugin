@@ -1,0 +1,45 @@
+﻿@model BTCPayServer.Models.ServerViewModels.LogsViewModel
+@{
+    ViewData.SetActivePage(ServerNavPages.Logs, "Logs");
+}
+
+<h3 class="mb-4">@ViewData["Title"]</h3>
+
+<ul class="list-unstyled">
+    @foreach (var file in Model.LogFiles)
+    {
+        <li>
+            <a asp-action="LogsView" asp-route-file="@file.Name">@file.Name</a>
+        </li>
+    }
+</ul>
+
+<nav aria-label="..." class="w-100">
+    <ul class="pagination float-start">
+        <li class="page-item @(Model.LogFileOffset == 0 ? "disabled" : null)">
+            <a class="page-link" asp-action="LogsView" asp-route-offset="@(Model.LogFileOffset - 5)">&laquo;</a>
+        </li>
+        <li class="page-item disabled">
+            <span class="page-link">Showing @Model.LogFileOffset - (@(Model.LogFileOffset+Model.LogFiles.Count)) of @Model.LogFileCount</span>
+        </li>
+        <li class="page-item @((Model.LogFileOffset + Model.LogFiles.Count) < Model.LogFileCount ? null : "disabled")">
+            <a class="page-link" asp-action="LogsView" asp-route-offset="@(Model.LogFileOffset + Model.LogFiles.Count)">&raquo;</a>
+        </li>
+    </ul>
+</nav>
+
+@if (!string.IsNullOrEmpty(Model.Log))
+{
+<br>
+<br>
+<br>
+
+<pre>
+@Model.Log
+</pre>
+}
+
+
+@section PageFootContent {
+    <partial name="_ValidationScriptsPartial" />
+}

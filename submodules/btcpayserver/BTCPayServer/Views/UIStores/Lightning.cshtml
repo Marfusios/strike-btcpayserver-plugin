@@ -1,0 +1,81 @@
+@using BTCPayServer.Client
+@using BTCPayServer.Services
+@model LightningViewModel
+@{
+    Layout = "../Shared/_NavLayout.cshtml";
+    ViewData["NavPartialName"] = "../UILightning/_Nav";
+    ViewData.SetActivePage(StoreNavPages.Lightning, $"{Model.CryptoCode} Lightning", Context.GetStoreData().Id);
+}
+
+@inject LightningClientFactoryService LightningClientFactoryService
+@inject BTCPayNetworkProvider NetworkProvider
+<div class="mb-5">
+    <h3 class="mb-3">@ViewData["Title"]</h3>
+    <div class="mb-3">
+        <span class="me-3" id="NodeType">@Model.LightningNodeType Node</span>
+
+        @if (Model.LightningNodeType != LightningNodeType.Internal)
+        {
+            <span class="me-3" id="CustomNodeInfo">
+                @try
+                {
+                    var client = LightningClientFactoryService.Create(Model.ConnectionString, NetworkProvider.GetNetwork<BTCPayNetwork>(Model.CryptoCode));
+                    <span>@client.GetDisplayName()</span>
+                    var uri = client.GetServerUri();
+                    if (uri is not null)
+                    {
+                        <span>(@uri.Host)</span>
+                    }
+                }
+                catch (Exception)
+                {
+                    @Model.ConnectionString
+                }
+            </span>
+        }
+
+        <a
+           asp-controller="UIPublicLightningNodeInfo"
+           asp-action="ShowLightningNodeInfo"
+           asp-route-cryptoCode="@Model.CryptoCode"
+           asp-route-storeId="@Model.StoreId"
+           target="_blank"
+           id="PublicNodeInfo">
+            Public Node Info
+        </a>
+    </div>
+
+    @if (Model.Services != null && Model.Services.Any())
+    {
+        <div permission="@Policies.CanModifyServerSettings" class="mt-5">
+            <h3 class="mb-3">Services</h3>
+            <div id="Services" class="services-list">
+                @foreach (var service in Model.Services)
+                {
+                    @if (!string.IsNullOrEmpty(service.Error))
+                    {
+                        <div class="service" id="@($"Service-{service.ServiceName}")">
+                            <img src="@($"~/img/{service.Type.ToLower()}.png")" asp-append-version="true" alt="@service.DisplayName" />
+                            <h6>@service.DisplayName</h6>
+                            <small class="d-block mt-3 lh-sm fw-semibold text-danger">@service.Error</small>
+                        </div>
+                    }
+                    else if (string.IsNullOrEmpty(service.Link))
+                    {
+                        <a asp-controller="UIServer" asp-action="Service" asp-route-serviceName="@service.ServiceName" asp-route-cryptoCode="@service.CryptoCode" class="service" id="@($"Service-{service.ServiceName}")">
+                            <img src="@($"~/img/{service.Type.ToLower()}.png")" asp-append-version="true" alt="@service.DisplayName" />
+                            <h6>@service.DisplayName</h6>
+                        </a>
+                    }
+                    else
+                    {
+                        <a href="@service.Link" target="_blank" rel="noreferrer noopener" class="service" id="@($"Service-{service.ServiceName}")">
+                            <img src="@($"~/img/{service.Type.ToLower()}.png")" asp-append-version="true" alt="@service.DisplayName" />
+                            <h6>@service.DisplayName</h6>
+                        </a>
+                    }
+                }
+            </div>
+        </div>
+    }
+</div>

@@ -1,0 +1,27 @@
+﻿@model BTCPayServer.Security.Bitpay.BitTokenEntity
+@{
+    Layout = "../Shared/_NavLayout.cshtml";
+    ViewData.SetActivePage(StoreNavPages.Tokens, "Access Tokens", Context.GetStoreData().Id);
+}
+
+<h3 class="mb-4">@ViewData["Title"]</h3>
+
+<div class="row">
+    <div class="col-md-8">
+        <h5>Token Information</h5>
+        <table class="table table-hover">
+            <tr>
+                <th>Label</th>
+                <td>@Model.Label</td>
+            </tr>
+            <tr>
+                <th>SIN</th>
+                <td>@Model.SIN</td>
+            </tr>
+            <tr>
+                <th>Token</th>
+                <td>@Model.Value</td>
+            </tr>
+        </table>
+    </div>
+</div>

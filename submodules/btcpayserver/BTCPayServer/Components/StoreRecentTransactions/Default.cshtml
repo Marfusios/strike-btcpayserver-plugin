@@ -1,0 +1,98 @@
+@using BTCPayServer.Abstractions.Extensions
+@using BTCPayServer.Services
+@inject DisplayFormatter DisplayFormatter
+@model BTCPayServer.Components.StoreRecentTransactions.StoreRecentTransactionsViewModel
+
+<div class="widget store-recent-transactions" id="StoreRecentTransactions-@Model.Store.Id">
+    <header>
+        <h3>Recent Transactions</h3>
+        @if (Model.Transactions.Any())
+        {
+            <a asp-controller="UIWallets" asp-action="WalletTransactions" asp-route-walletId="@Model.WalletId">View All</a>
+        }
+    </header>
+    @if (Model.InitialRendering)
+    {
+        <div class="loading d-flex justify-content-center p-3">
+            <div class="spinner-border text-light" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+        <script>
+            (async () => {
+                const url = @Safe.Json(Url.Action("RecentTransactions", "UIStores", new { storeId = Model.Store.Id, cryptoCode = Model.CryptoCode }));
+                const storeId = @Safe.Json(Model.Store.Id);
+                const response = await fetch(url);
+                if (response.ok) {
+                    document.getElementById(`StoreRecentTransactions-${storeId}`).outerHTML = await response.text();
+                }
+            })();
+        </script>
+    }
+    else if (Model.Transactions.Any())
+    {
+        <div class="table-responsive mt-3 mb-0">
+            <table class="table table-hover mb-0">
+                <thead>
+                <tr>
+                    <th class="w-125px">Date</th>
+                    <th>Transaction</th>
+                    <th>Labels</th>
+                    <th class="text-end">Amount</th>
+                </tr>
+                </thead>
+                <tbody>
+                @foreach (var tx in Model.Transactions)
+                {
+                    <tr>
+                        <td>@tx.Timestamp.ToTimeAgo()</td>
+                        <td>
+                            <vc:truncate-center text="@tx.Id" link="@tx.Link" classes="truncate-center-id" />
+                        </td>
+                        <td>
+                            @if (tx.Labels.Any())
+                            {
+                                <div class="d-flex flex-wrap gap-2 align-items-center">
+                                    @foreach (var label in tx.Labels)
+                                    {
+                                        <div class="transaction-label" style="--label-bg:@label.Color;--label-fg:@label.TextColor">
+                                            <span>@label.Text</span>
+                                            @if (!string.IsNullOrEmpty(label.Link))
+                                            {
+                                                <a class="transaction-label-info transaction-details-icon" href="@label.Link"
+                                                   target="_blank" rel="noreferrer noopener" title="@label.Tooltip" data-bs-html="true"
+                                                   data-bs-toggle="tooltip" data-bs-custom-class="transaction-label-tooltip">
+                                                    <vc:icon symbol="info" />
+                                                </a>
+                                            }
+                                        </div>
+                                    }
+                                </div>
+                            }
+                            
+                        </td>
+                        @if (tx.Positive)
+                        {
+                            <td class="text-end text-success">
+                                <span data-sensitive>@DisplayFormatter.Currency(tx.Balance, tx.Currency)</span>
+                            </td>
+                        }
+                        else
+                        {
+                            <td class="text-end text-danger">
+                                <span data-sensitive>@DisplayFormatter.Currency(tx.Balance, tx.Currency)</span>
+                            </td>
+                        }
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    }
+    else
+    {
+        <p class="text-secondary mt-3 mb-0">
+            There are no recent transactions.
+        </p>
+    }
+</div>
