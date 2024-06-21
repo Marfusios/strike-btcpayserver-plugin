@@ -6,11 +6,11 @@ on:
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
-
     steps:
     - uses: actions/checkout@v2
+      with:
+        submodules: 'true'
     - name: Setup .NET Core
       uses: actions/setup-dotnet@v1
       with:
@@ -21,3 +21,4 @@ jobs:
       run: dotnet build --configuration Release --no-restore
     - name: Test
       run: dotnet test --no-restore --verbosity normal
+      working-directory: ./plugin

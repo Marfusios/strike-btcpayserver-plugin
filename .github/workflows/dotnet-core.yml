@@ -11,11 +11,11 @@ permissions:
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
-
     steps:
     - uses: actions/checkout@v2
+      with:
+        submodules: 'true'
     - name: Setup .NET Core
       uses: actions/setup-dotnet@v1
       with:
@@ -27,6 +27,7 @@ jobs:
       run: dotnet build --configuration Release --no-restore
     - name: Test
       run: dotnet test --no-restore --logger "trx;LogFileName=tests.trx"
+      working-directory: ./plugin
       env:
           Strike__ApiKey: ${{secrets.STRIKE_API_KEY}}
     - name: Test Report
@@ -36,6 +37,7 @@ jobs:
         name: tests
         path: '**/*.trx'
         reporter: dotnet-trx
+        working-directory: ./plugin
     #- name: Pack library project
     #  run: dotnet pack src/Strike.Client/Strike.Client.csproj --no-build --configuration Release --include-symbols -p:SymbolPackageFormat=snupkg -o .
     #- name: Publish library (NuGet)
