@@ -2,7 +2,6 @@
 using System;
 using System.Linq;
 using BTCPayServer.Lightning;
-using ExchangeSharp;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Strike.Client;
@@ -21,8 +20,7 @@ public class StrikeLightningConnectionStringHandler : ILightningConnectionString
         _serviceProvider = serviceProvider;
         _loggerFactory = loggerFactory;
     }
-
-
+    
     public ILightningClient? Create(string connectionString, Network network, out string? error)
     {
         var kv = LightningConnectionStringHelper.ExtractValues(connectionString, out var type);
@@ -31,20 +29,22 @@ public class StrikeLightningConnectionStringHandler : ILightningConnectionString
             error = null;
             return null;
         }
-
-        if (!kv.TryGetValue("environment", out var environmentStr))
+        
+        var environment = network.Name switch
         {
-            environmentStr = network.Name switch
-            {
-                nameof(Network.Main) => StrikeEnvironment.Live.ToStringLowerInvariant(),
-                _ => StrikeEnvironment.Development.ToStringLowerInvariant()
-            };
-        }
-
-        if (!Enum.TryParse<StrikeEnvironment>(environmentStr, true, out var environment))
+	        nameof(Network.Main) => StrikeEnvironment.Live,
+	        _ => StrikeEnvironment.Development
+        };
+        Uri? serverUrl = null;
+        
+        if (kv.TryGetValue("server", out var serverStr))
         {
-            error = "The key 'environment' is not in correct format, try 'live' or 'development'";
-            return null;
+	        if (!Uri.TryCreate(serverStr, UriKind.Absolute, out serverUrl)
+	            || serverUrl.Scheme != "http" && serverUrl.Scheme != "https")
+	        {
+		        error = "The key 'server' should be an URI starting by http:// or https://";
+		        return null;
+	        }
         }
 
         if (!kv.TryGetValue("api-key", out var apiKey))
@@ -62,8 +62,12 @@ public class StrikeLightningConnectionStringHandler : ILightningConnectionString
         error = null;
 
         var client = _serviceProvider.GetRequiredService<StrikeClient>();
+        client.ThrowOnError = true;
         client.ApiKey = apiKey;
         client.Environment = environment;
+        
+        if(serverUrl != null)
+			client.ServerUrl = serverUrl;
 
         var logger = _loggerFactory.CreateLogger<StrikeLightningClient>();
         Currency accountFiatCurrency;
@@ -82,7 +86,7 @@ public class StrikeLightningConnectionStringHandler : ILightningConnectionString
         }
         catch (Exception e)
         {
-            error = "Invalid server or api key";
+            error = $"Invalid server or api key. Error: {e.Message}";
             return null;
         }
 
@@ -98,6 +102,6 @@ public class StrikeLightningConnectionStringHandler : ILightningConnectionString
         }
 
 
-        return new StrikeLightningClient(client, accountFiatCurrency, targetReceivingCurrency, logger);
+        return new StrikeLightningClient(client, accountFiatCurrency, targetReceivingCurrency, network, logger);
     }
 }

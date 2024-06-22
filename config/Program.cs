@@ -1,23 +1,26 @@
 ﻿using System.Reflection;
 using System.Text.Json;
 
-var plugins = Directory.GetDirectories("../../../../plugin");
+var pluginName = "BTCPayServer.Plugins.Strike";
+var directories = Directory.GetDirectories("../../../../plugin");
 var p = "";
-foreach (var plugin in plugins)
+foreach (var directory in directories)
 {
 	try
 	{
+		if(!directory.EndsWith("bin"))
+			continue;
+		
 		var assemblyConfigurationAttribute = typeof(Program).Assembly.GetCustomAttribute<AssemblyConfigurationAttribute>();
 		var buildConfigurationName = assemblyConfigurationAttribute?.Configuration;
-		var x = Directory.GetDirectories(Path.Combine(plugin, "bin"));
 
-		var f = $"{Path.GetFullPath(plugin)}/bin/{buildConfigurationName}/net8.0/{Path.GetFileName(plugin)}.dll";
+		var f = $"{Path.GetFullPath(directory)}/{buildConfigurationName}/net8.0/{pluginName}.dll";
 		if (File.Exists(f))
 			p += $"{f};";
 		else
 		{
 
-			f = $"{Path.GetFullPath(plugin)}/bin/Debug/net8.0/{Path.GetFileName(plugin)}.dll";
+			f = $"{Path.GetFullPath(directory)}/Debug/net8.0/{pluginName}.dll";
 			if (File.Exists(f))
 				p += $"{f};";
 		}

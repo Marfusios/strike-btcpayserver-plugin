@@ -6,28 +6,26 @@ using BTCPayServer.Lightning;
 using Microsoft.Extensions.DependencyInjection;
 using Strike.Client;
 
-namespace BTCPayServer.Plugins.Strike
+namespace BTCPayServer.Plugins.Strike;
+
+public class StrikePlugin : BaseBTCPayServerPlugin
 {
+	public override IBTCPayServerPlugin.PluginDependency[] Dependencies { get; } =
+	{
+		new() {Identifier = nameof(BTCPayServer), Condition = ">=1.12.0"}
 
-    public class StrikePlugin : BaseBTCPayServerPlugin
-    {
-        public override IBTCPayServerPlugin.PluginDependency[] Dependencies { get; } =
-        {
-            new() {Identifier = nameof(BTCPayServer), Condition = ">=1.12.0"}
+	};
 
-        };
+	public override void Execute(IServiceCollection applicationBuilder)
+	{
+		applicationBuilder.AddSingleton<IUIExtension>(new UIExtension("Strike/LNPaymentMethodSetupTab", "ln-payment-method-setup-tab"));
+		applicationBuilder.AddSingleton<ILightningConnectionStringHandler>(provider => provider.GetRequiredService<StrikeLightningConnectionStringHandler>());
+		applicationBuilder.AddSingleton<StrikeLightningConnectionStringHandler>();
 
-        public override void Execute(IServiceCollection applicationBuilder)
-        {
-            applicationBuilder.AddSingleton<IUIExtension>(new UIExtension("Strike/LNPaymentMethodSetupTab", "ln-payment-method-setup-tab"));
-            applicationBuilder.AddSingleton<ILightningConnectionStringHandler>(provider => provider.GetRequiredService<StrikeLightningConnectionStringHandler>());
-            applicationBuilder.AddSingleton<StrikeLightningConnectionStringHandler>();
+		applicationBuilder.AddStrikeHttpClient();
+		applicationBuilder.AddStrikeClient();
 
-            applicationBuilder.AddStrikeHttpClient();
-            applicationBuilder.AddStrikeClient();
+		base.Execute(applicationBuilder);
+	}
 
-            base.Execute(applicationBuilder);
-        }
-
-    }
 }

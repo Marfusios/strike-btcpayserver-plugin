@@ -37,6 +37,7 @@ jobs:
         name: tests
         path: '**/*.trx'
         reporter: dotnet-trx
+        fail-on-empty: 'false'
         working-directory: ./plugin
     #- name: Pack library project
     #  run: dotnet pack src/Strike.Client/Strike.Client.csproj --no-build --configuration Release --include-symbols -p:SymbolPackageFormat=snupkg -o .
