@@ -1,7 +1,10 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
 using BTCPayServer.Lightning;
+using BTCPayServer.Plugins.Strike.Persistence;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Strike.Client;
@@ -25,6 +28,19 @@ public class StrikeLightningConnectionStringHandler : ILightningConnectionString
 
 	public ILightningClient? Create(string connectionString, Network network, out string? error)
 	{
+		try
+		{
+			return CreateInternal(connectionString, network, out error);
+		}
+		catch (Exception e)
+		{
+			error = $"Error while initializing Strike plugin: {e.Message}";
+			return null;
+		}
+	}
+
+	private ILightningClient? CreateInternal(string connectionString, Network network, out string? error)
+	{
 		var kv = LightningConnectionStringHelper.ExtractValues(connectionString, out var type);
 		if (type != "strike")
 		{
@@ -43,7 +59,7 @@ public class StrikeLightningConnectionStringHandler : ILightningConnectionString
 		if (kv.TryGetValue("server", out var serverStr))
 		{
 			if (!Uri.TryCreate(serverStr, UriKind.Absolute, out serverUrl)
-				|| serverUrl.Scheme != "http" && serverUrl.Scheme != "https")
+				|| (serverUrl.Scheme != "http" && serverUrl.Scheme != "https"))
 			{
 				error = "The key 'server' should be an URI starting by http:// or https://";
 				return null;
@@ -63,6 +79,12 @@ public class StrikeLightningConnectionStringHandler : ILightningConnectionString
 		}
 
 		error = null;
+
+		// TODO: use StoreId instead (but how to get it?)
+		var tenantId = ComputeHash(apiKey);
+
+		var db = _serviceProvider.GetRequiredService<StrikeStorageFactory>();
+		db.TenantId = tenantId;
 
 		var client = _serviceProvider.GetRequiredService<StrikeClient>();
 		client.ThrowOnError = true;
@@ -89,8 +111,7 @@ public class StrikeLightningConnectionStringHandler : ILightningConnectionString
 			return null;
 		}
 
-
-		return new StrikeLightningClient(client, accountFiatCurrency.Value, targetReceivingCurrency, network, logger);
+		return new StrikeLightningClient(client, db, accountFiatCurrency.Value, targetReceivingCurrency, network, logger);
 	}
 
 	private Currency? GetAccountFiatCurrency(string connectionString, StrikeClient client, ref string? error)
@@ -117,5 +138,20 @@ public class StrikeLightningConnectionStringHandler : ILightningConnectionString
 			error = $"Invalid server or api key. Error: {e.Message}";
 			return null;
 		}
+	}
+
+	private static string ComputeHash(string value)
+	{
+		var sb = new StringBuilder();
+		using (var hash = SHA256.Create())
+		{
+			var enc = Encoding.UTF8;
+			var result = hash.ComputeHash(enc.GetBytes(value));
+
+			foreach (var b in result)
+				sb.Append(b.ToString("x2"));
+		}
+
+		return sb.ToString();
 	}
 }

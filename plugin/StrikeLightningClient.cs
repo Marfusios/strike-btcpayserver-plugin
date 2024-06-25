@@ -1,10 +1,10 @@
 ﻿using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using BTCPayServer.Lightning;
+using BTCPayServer.Plugins.Strike.Persistence;
 using ExchangeSharp;
 using Microsoft.Extensions.Logging;
 using NBitcoin;
@@ -22,15 +22,13 @@ public class StrikeLightningClient : ILightningClient
 	private readonly Currency _accountFiatCurrency;
 	private readonly Currency _targetReceiveCurrency;
 	private readonly Network _network;
+	private readonly StrikeStorageFactory _db;
 
-	// TODO: move to DB
-	private static readonly ConcurrentDictionary<string, InvoiceQuote> QuoteToInvoice = new();
-	private static readonly ConcurrentDictionary<string, string> NotifiedInvoices = new();
-
-	public StrikeLightningClient(StrikeClient client, Currency accountFiatCurrency, Currency targetReceiveCurrency,
+	public StrikeLightningClient(StrikeClient client, StrikeStorageFactory db, Currency accountFiatCurrency, Currency targetReceiveCurrency,
 		Network network, ILogger logger)
 	{
 		_logger = logger;
+		_db = db;
 		_network = network;
 		_targetReceiveCurrency = targetReceiveCurrency;
 		_accountFiatCurrency = accountFiatCurrency;
@@ -48,37 +46,30 @@ public class StrikeLightningClient : ILightningClient
 	public async Task<LightningInvoice?> GetInvoice(string invoiceId, CancellationToken cancellation = new())
 	{
 		var invoice = await _client.Invoices.FindInvoice(Guid.Parse(invoiceId));
-		return ConvertInvoice(invoice);
+		return await ConvertInvoice(invoice);
 	}
 
 	public async Task<LightningInvoice?> GetInvoice(uint256 paymentHash, CancellationToken cancellation = new())
 	{
-		var found = QuoteToInvoice
-			.FirstOrDefault(x => ExtractPaymentHash(x.Value) == paymentHash.ToString());
-		if (found.Value == null)
+		var found = await _db.ResolveStorage().FindByPaymentHash(paymentHash.ToString());
+		if (found == null)
 		{
 			return null;
 		}
-		return await GetInvoice(found.Key, cancellation);
+		return await GetInvoice(found.InvoiceId, cancellation);
 	}
 
 	public async Task<LightningInvoice[]> ListInvoices(CancellationToken cancellation = new())
 	{
 		var invoices = await _client.Invoices.GetInvoices();
-
-		return invoices.Items
-			.Select(ConvertInvoice)
-			.Where(x => x != null)
-			.ToArray()!;
+		return await ConvertInvoices(invoices);
 	}
 
 	public async Task<LightningInvoice[]> ListInvoices(ListInvoicesParams? request, CancellationToken cancellation = new())
 	{
 		var invoices = await _client.Invoices.GetInvoices(100, (int)(request?.OffsetIndex ?? 0));
 
-		return invoices.Items
-			.Select(ConvertInvoice)
-			.Where(x => x != null)
+		return (await ConvertInvoices(invoices))
 			.Where(x => request?.PendingOnly == true && x.Status == LightningInvoiceStatus.Unpaid)
 			.ToArray()!;
 	}
@@ -209,9 +200,22 @@ public class StrikeLightningClient : ILightningClient
 		});
 
 		var invoiceId = invoice.InvoiceId.ToString();
-		QuoteToInvoice[invoiceId] = quote;
-
 		var parsedInvoice = BOLT11PaymentRequest.Parse(quote.LnInvoice, _network);
+
+		var entity = new StrikeQuote
+		{
+			InvoiceId = invoiceId,
+			LightningInvoice = quote.LnInvoice,
+			CreatedAt = DateTimeOffset.UtcNow,
+			ExpiresAt = parsedInvoice.ExpiryDate,
+			PaymentHash = parsedInvoice.PaymentHash?.ToString() ?? string.Empty,
+			RequestedBtcAmount = amount.ToUnit(LightMoneyUnit.BTC),
+			RealBtcAmount = parsedInvoice.MinimumAmount.ToUnit(LightMoneyUnit.BTC),
+			TargetAmount = invoice.Amount.Amount,
+			TargetCurrency = invoice.Amount.Currency.ToStringUpperInvariant(),
+			ConversionRate = quote.ConversionRate.Amount
+		};
+		await _db.ResolveStorage().Store(entity);
 
 		return new LightningInvoice
 		{
@@ -240,23 +244,29 @@ public class StrikeLightningClient : ILightningClient
 		return new Money { Amount = btcAmount * foundRate.Amount, Currency = _targetReceiveCurrency };
 	}
 
-	private LightningInvoice? ConvertInvoice(Invoice invoice)
+	private async Task<LightningInvoice?> ConvertInvoice(Invoice invoice)
 	{
 		try
 		{
+			var storage = _db.ResolveStorage();
 			var invoiceId = invoice.InvoiceId.ToString();
-			var quote = QuoteToInvoice.GetValueOrDefault(invoiceId);
+			var quote = await storage.FindByInvoiceId(invoiceId);
 			if (quote == null)
 				return null;
 
-			var parsedInvoice = BOLT11PaymentRequest.Parse(quote.LnInvoice, _network);
+			var parsedInvoice = BOLT11PaymentRequest.Parse(quote.LightningInvoice, _network);
+			var status = TranslateStatus(invoice.State, quote.ExpiresAt);
 
-			var status = TranslateStatus(invoice.State, quote.Expiration);
+			if (status == LightningInvoiceStatus.Paid && !quote.Paid)
+			{
+				quote.Paid = true;
+				await storage.Store(quote);
+			}
 
 			return new LightningInvoice
 			{
 				Id = invoiceId,
-				BOLT11 = quote.LnInvoice,
+				BOLT11 = quote.LightningInvoice,
 				PaymentHash = parsedInvoice.PaymentHash?.ToString(),
 				ExpiresAt = parsedInvoice.ExpiryDate,
 				Amount = parsedInvoice.MinimumAmount,
@@ -272,8 +282,24 @@ public class StrikeLightningClient : ILightningClient
 		}
 	}
 
+	private async Task<LightningInvoice[]> ConvertInvoices(InvoicesCollection invoices)
+	{
+		var result = new List<LightningInvoice>();
+		foreach (var invoice in invoices.Items)
+		{
+			var converted = await ConvertInvoice(invoice);
+			if (converted == null)
+				continue;
+			result.Add(converted);
+		}
+		return result.ToArray();
+	}
+
 	private LightningInvoiceStatus TranslateStatus(InvoiceState state, DateTimeOffset expiration)
 	{
+		if (state == InvoiceState.Paid)
+			return LightningInvoiceStatus.Paid;
+
 		var now = DateTimeOffset.UtcNow;
 		if (now > expiration)
 			return LightningInvoiceStatus.Expired;
@@ -282,15 +308,8 @@ public class StrikeLightningClient : ILightningClient
 		{
 			InvoiceState.Unpaid => LightningInvoiceStatus.Unpaid,
 			InvoiceState.Pending => LightningInvoiceStatus.Unpaid,
-			InvoiceState.Paid => LightningInvoiceStatus.Paid,
 			_ => LightningInvoiceStatus.Expired
 		};
-	}
-
-	private string? ExtractPaymentHash(InvoiceQuote quote)
-	{
-		var parsedInvoice = BOLT11PaymentRequest.Parse(quote.LnInvoice, _network);
-		return parsedInvoice.PaymentHash?.ToString();
 	}
 
 	private class Listener : ILightningInvoiceListener
@@ -307,19 +326,23 @@ public class StrikeLightningClient : ILightningClient
 
 		public async Task<LightningInvoice> WaitInvoice(CancellationToken cancellation)
 		{
-			foreach (var invoice in QuoteToInvoice)
-			{
-				if (NotifiedInvoices.ContainsKey(invoice.Key))
-					continue;
+			var storage = _client._db.ResolveStorage();
+			var invoices = await storage.GetUnobserved(cancellation);
 
-				var found = await _client.GetInvoice(invoice.Key, cancellation);
+			foreach (var invoice in invoices)
+			{
+				var found = await _client.GetInvoice(invoice.InvoiceId, cancellation);
 				if (found == null)
 					continue;
 
 				if (found.Status == LightningInvoiceStatus.Unpaid)
 					continue;
 
-				NotifiedInvoices[invoice.Key] = invoice.Key;
+
+				invoice.Paid = found.Status == LightningInvoiceStatus.Paid;
+				invoice.Observed = true;
+				await storage.Store(invoice);
+
 				return found;
 			}
 
