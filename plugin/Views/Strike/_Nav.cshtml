@@ -1,0 +1,24 @@
+@using BTCPayServer.Client
+@using BTCPayServer.Models.StoreViewModels
+@using BTCPayServer.Security
+@using Microsoft.AspNetCore.Mvc.TagHelpers
+
+@{
+    var storeId = Model switch
+    {
+        string s => s,
+        StoreDashboardViewModel dashboardModel => dashboardModel.StoreId,
+        _ => Context.GetImplicitStoreId()
+    };
+}
+
+<div class="sticky-header-setup"></div>
+<div class="sticky-header mb-xl">
+	<h2 class="mt-1 mb-2 mb-lg-4">Strike</h2>
+	<nav id="SectionNav">
+		<div class="nav">
+			<a permission="@Policies.CanViewStoreSettings" asp-action="Dashboard" asp-route-storeId="@storeId" class="nav-link @ViewData.IsActivePage("Strike", null, "Dashboard")">Dashboard</a>
+			<a permission="@Policies.CanModifyStoreSettings" asp-action="Configure" asp-route-storeId="@storeId" class="nav-link @ViewData.IsActivePage("Strike", null, "Configure")">Configuration</a>
+		</div>
+	</nav>
+</div>

@@ -15,7 +15,7 @@ public class StrikeDbContextFactory : BaseDbContextFactory<StrikeDbContext>
 	{
 	}
 
-	public override StrikeDbContext CreateContext(Action<NpgsqlDbContextOptionsBuilder>? npgsqlOptionsAction = null)
+	public override StrikeDbContext CreateContext()
 	{
 		var builder = new DbContextOptionsBuilder<StrikeDbContext>();
 		ConfigureBuilder(builder);

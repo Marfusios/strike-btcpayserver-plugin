@@ -1,0 +1,14 @@
+﻿@using BTCPayServer.Models.StoreViewModels
+@using BTCPayServer.Security
+@model object
+@{
+    var storeId = Model switch
+    {
+        string s => s,
+        StoreDashboardViewModel dashboardModel => dashboardModel.StoreId,
+        _ => Context.GetImplicitStoreId()
+    };
+    ViewData.SetActivePage("Strike", "Strike Dashboard", "Dashboard");
+}
+
+<h3>Dashboard</h3>

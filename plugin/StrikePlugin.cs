@@ -19,6 +19,8 @@ public class StrikePlugin : BaseBTCPayServerPlugin
 	public override void Execute(IServiceCollection applicationBuilder)
 	{
 		applicationBuilder.AddSingleton<IUIExtension>(new UIExtension("Strike/LNPaymentMethodSetupTab", "ln-payment-method-setup-tab"));
+		applicationBuilder.AddSingleton<IUIExtension>(new UIExtension("Strike/StrikeNav", "store-integrations-nav"));
+		
 		applicationBuilder.AddSingleton<ILightningConnectionStringHandler>(provider => provider.GetRequiredService<StrikeLightningConnectionStringHandler>());
 		applicationBuilder.AddSingleton<StrikeLightningConnectionStringHandler>();
 
@@ -28,6 +30,7 @@ public class StrikePlugin : BaseBTCPayServerPlugin
 			var factory = provider.GetRequiredService<StrikeDbContextFactory>();
 			factory.ConfigureBuilder(o);
 		});
+		applicationBuilder.AddHostedService<StrikeDbContextMigrator>();
 
 		applicationBuilder.AddSingleton<StrikeStorageFactory>();
 		applicationBuilder.AddTransient<StrikeStorage>();
