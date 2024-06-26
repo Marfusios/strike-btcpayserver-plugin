@@ -1,12 +1,35 @@
 ﻿@using BTCPayServer
+@using Westwind.AspNetCore.Markdown
 @{
     ViewData.SetActivePage("Strike", "Configure", "Configure");
     var storeId = Context.GetCurrentStoreId();
+
+    async Task<string> GetDocumentationMarkdown()
+    {
+	    try
+	    {
+		    var documentationMarkdown = await Markdown.ParseFromUrlAsync("https://raw.githubusercontent.com/Marfusios/strike-btcpayserver-plugin/master/README.md");
+
+		    var text = documentationMarkdown ?? string.Empty;
+            var substring = "<h3 id=\"usage\">Usage</h3>";
+		    var substringLocation = text.IndexOf(substring, StringComparison.Ordinal);
+            if (substringLocation > 0)
+                text = text.Substring(substringLocation + substring.Length);
+
+            text = text.Replace("<p><strong>Pull Requests are welcome!</strong></p>", string.Empty);
+		    return text;
+	    }
+	    catch (Exception e)
+	    {
+		    return $"Failed to load documentation: {e.Message}";
+	    }
+    }
 }
 
-<div class="alert alert-warning mb-4 text-break" role="alert" v-pre>
-	<span>
-		This page is under construction. 
-		Configure Strike plugin <a href="/stores/@storeId/lightning/BTC/setup">here</a>.
-	</span>
+<div class="alert alert-success mb-4 text-break" role="alert">
+    <span>
+        Configure Strike plugin <a href="/stores/@storeId/lightning/BTC/setup" class="link-secondary" style="text-decoration: underline">here</a>.
+    </span>
 </div>
+
+<div>@Markdown.ParseHtmlString(await GetDocumentationMarkdown())</div>
