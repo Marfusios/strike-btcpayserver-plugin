@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
@@ -22,7 +22,7 @@ internal class StrikeDbContextMigrator : IHostedService
 	{
 		try
 		{
-			_logger.LogDebug("Migrating Strike database");
+			_logger.LogInformation("Migrating Strike database");
 			await using var ctx = _dbContextFactory.CreateContext();
 			await using var dbContext = _dbContextFactory.CreateContext();
 			await ctx.Database.MigrateAsync(cancellationToken);

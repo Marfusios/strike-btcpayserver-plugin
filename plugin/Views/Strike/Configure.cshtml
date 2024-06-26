@@ -3,22 +3,10 @@
     ViewData.SetActivePage("Strike", "Configure", "Configure");
     var storeId = Context.GetCurrentStoreId();
 }
-<form method="post" asp-action="Configure" asp-controller="Strike" asp-route-storeId="@storeId" enctype="multipart/form-data">
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="d-flex align-items-center justify-content-between mb-3">
-                <h3 class="mb-0">
-                    <span>@ViewData["Title"]</span>
-                </h3>
-                <div class="d-flex gap-3 mt-3 mt-sm-0">
-                    <button name="command" type="submit" value="save" class="btn btn-primary">Save</button>
-                    @* @if (active) *@
-                    @* { *@
-                    @*     <button name="command" type="submit" value="clear" class="btn btn-danger">Clear</button> *@
-                    @* } *@
-                </div>
-            </div>
-            
-        </div>
-    </div>
-</form>
+
+<div class="alert alert-warning mb-4 text-break" role="alert" v-pre>
+	<span>
+		This page is under construction. 
+		Configure Strike plugin <a href="/stores/@storeId/lightning/BTC/setup">here</a>.
+	</span>
+</div>

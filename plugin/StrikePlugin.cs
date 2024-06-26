@@ -20,7 +20,7 @@ public class StrikePlugin : BaseBTCPayServerPlugin
 	{
 		applicationBuilder.AddSingleton<IUIExtension>(new UIExtension("Strike/LNPaymentMethodSetupTab", "ln-payment-method-setup-tab"));
 		applicationBuilder.AddSingleton<IUIExtension>(new UIExtension("Strike/StrikeNav", "store-integrations-nav"));
-		
+
 		applicationBuilder.AddSingleton<ILightningConnectionStringHandler>(provider => provider.GetRequiredService<StrikeLightningConnectionStringHandler>());
 		applicationBuilder.AddSingleton<StrikeLightningConnectionStringHandler>();
 

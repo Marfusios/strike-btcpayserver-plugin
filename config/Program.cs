@@ -3,26 +3,26 @@ using System.Text.Json;
 
 var pluginName = "BTCPayServer.Plugins.Strike";
 var directories = Directory.GetDirectories("../../../../plugin");
-var p = "";
+var targetPlugins = "";
 foreach (var directory in directories)
 {
 	try
 	{
-		if(!directory.EndsWith("bin"))
+		if (!directory.EndsWith("bin"))
 			continue;
-		
+
 		var assemblyConfigurationAttribute = typeof(Program).Assembly.GetCustomAttribute<AssemblyConfigurationAttribute>();
 		var buildConfigurationName = assemblyConfigurationAttribute?.Configuration;
 
 		var f = $"{Path.GetFullPath(directory)}/{buildConfigurationName}/net8.0/{pluginName}.dll";
 		if (File.Exists(f))
-			p += $"{f};";
+			targetPlugins += $"{f};";
 		else
 		{
 
 			f = $"{Path.GetFullPath(directory)}/Debug/net8.0/{pluginName}.dll";
 			if (File.Exists(f))
-				p += $"{f};";
+				targetPlugins += $"{f};";
 		}
 	}
 	catch (Exception e)
@@ -33,7 +33,7 @@ foreach (var directory in directories)
 
 var content = JsonSerializer.Serialize(new
 {
-	DEBUG_PLUGINS = p
+	DEBUG_PLUGINS = targetPlugins
 });
 
 Console.WriteLine(content);

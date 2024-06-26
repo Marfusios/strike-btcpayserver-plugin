@@ -15,6 +15,8 @@ public class StrikeQuote : IHasTenantId
 
 	public string PaymentHash { get; init; } = string.Empty;
 
+	public string? Description { get; init; }
+
 	public DateTimeOffset CreatedAt { get; init; }
 
 	public DateTimeOffset ExpiresAt { get; init; }
@@ -63,6 +65,7 @@ public class StrikeQuoteConfiguration : IEntityTypeConfiguration<StrikeQuote>
 		builder.Property(x => x.InvoiceId).HasMaxLength(300);
 		builder.Property(x => x.LightningInvoice).HasMaxLength(1000);
 		builder.Property(x => x.PaymentHash).HasMaxLength(300);
+		builder.Property(x => x.Description).HasMaxLength(1000);
 
 		builder.Property(x => x.RequestedBtcAmount);
 		builder.Property(x => x.RealBtcAmount);

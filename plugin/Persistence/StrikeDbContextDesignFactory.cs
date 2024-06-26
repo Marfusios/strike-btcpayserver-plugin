@@ -8,7 +8,7 @@ public class StrikeDbContextDesignFactory : IDesignTimeDbContextFactory<StrikeDb
 	{
 		var builder = new DbContextOptionsBuilder<StrikeDbContext>();
 
-		builder.UseNpgsql("User ID=postgres;Host=127.0.0.1;Port=39372;Database=btcpayserver4");
+		builder.UseNpgsql("User ID=postgres;Host=127.0.0.1;Port=39372;Database=btcpayserverdesign");
 		return new StrikeDbContext(builder.Options);
 	}
 }

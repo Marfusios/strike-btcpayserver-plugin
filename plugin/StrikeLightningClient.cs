@@ -206,6 +206,7 @@ public class StrikeLightningClient : ILightningClient
 		{
 			InvoiceId = invoiceId,
 			LightningInvoice = quote.LnInvoice,
+			Description = invoice.Description,
 			CreatedAt = DateTimeOffset.UtcNow,
 			ExpiresAt = parsedInvoice.ExpiryDate,
 			PaymentHash = parsedInvoice.PaymentHash?.ToString() ?? string.Empty,
@@ -238,7 +239,7 @@ public class StrikeLightningClient : ILightningClient
 		var foundRate = rates.FirstOrDefault(x =>
 			x.TargetCurrency == _targetReceiveCurrency
 			&& x.SourceCurrency == Currency.Btc);
-		if (foundRate == null || foundRate.Amount <= 0)
+		if (foundRate is not { Amount: > 0 })
 			throw new InvalidOperationException(
 				$"Cannot calculate invoice amount, rate for BTC/{_targetReceiveCurrency.ToStringUpperInvariant()} is unavailable");
 		return new Money { Amount = btcAmount * foundRate.Amount, Currency = _targetReceiveCurrency };
@@ -347,6 +348,8 @@ public class StrikeLightningClient : ILightningClient
 			}
 
 			await Task.Delay(TimeSpan.FromSeconds(2), cancellation);
+
+			// BTCPayServer expects a non-null invoice to be returned
 			return new LightningInvoice
 			{
 				Id = string.Empty

@@ -96,7 +96,8 @@ public class StrikeLightningConnectionStringHandler : ILightningConnectionString
 
 		var logger = _loggerFactory.CreateLogger<StrikeLightningClient>();
 
-		var accountFiatCurrency = GetAccountFiatCurrency(connectionString, client, ref error);
+		var connectionHash = ComputeHash(connectionString);
+		var accountFiatCurrency = GetAccountFiatCurrency(connectionHash, client, ref error);
 		if (accountFiatCurrency == null)
 			return null;
 
@@ -114,9 +115,9 @@ public class StrikeLightningConnectionStringHandler : ILightningConnectionString
 		return new StrikeLightningClient(client, db, accountFiatCurrency.Value, targetReceivingCurrency, network, logger);
 	}
 
-	private Currency? GetAccountFiatCurrency(string connectionString, StrikeClient client, ref string? error)
+	private Currency? GetAccountFiatCurrency(string connectionKey, StrikeClient client, ref string? error)
 	{
-		if (_fiatCurrencyForConnection.TryGetValue(connectionString, out var cachedCurrency))
+		if (_fiatCurrencyForConnection.TryGetValue(connectionKey, out var cachedCurrency))
 			return cachedCurrency;
 
 		try
@@ -130,7 +131,7 @@ public class StrikeLightningConnectionStringHandler : ILightningConnectionString
 			}
 
 			var accountFiatCurrency = balances.FirstOrDefault(x => x.Currency != Currency.Btc)?.Currency ?? Currency.Usd;
-			_fiatCurrencyForConnection[connectionString] = accountFiatCurrency;
+			_fiatCurrencyForConnection[connectionKey] = accountFiatCurrency;
 			return accountFiatCurrency;
 		}
 		catch (Exception e)
