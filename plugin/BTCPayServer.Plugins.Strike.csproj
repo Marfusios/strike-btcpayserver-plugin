@@ -9,7 +9,7 @@
 	<PropertyGroup>
 		<Product>Strike</Product>
 		<Description>Strike as a lightning provider</Description>
-		<Version>1.0.1</Version>
+		<Version>1.1.0</Version>
 		<CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
 		<RootNamespace>BTCPayServer.Plugins.Strike</RootNamespace>
 	</PropertyGroup>

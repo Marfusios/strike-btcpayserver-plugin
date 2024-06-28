@@ -248,3 +248,4 @@ dotnet_diagnostic.CS1591.severity = none				# CS1591: Documentation for public m
 dotnet_diagnostic.CA1510.severity = none				# CA1510: Use 'ArgumentNullException.ThrowIfNull' instead of explicitly throwing a new exception
 dotnet_diagnostic.CA1008.severity = none				# CA1008: None enum
 dotnet_diagnostic.IDE0058.severity = none				# IDE0058: Expression value is never used
+dotnet_diagnostic.IDE0072.severity = none				# IDE0072: Populate switch

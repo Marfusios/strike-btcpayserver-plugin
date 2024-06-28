@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
@@ -27,16 +28,32 @@ public class StrikeStorage
 			.ToArrayAsync(cancellation);
 	}
 
-	public async Task<StrikeQuote?> FindByInvoiceId(string invoiceId)
+	public async Task<StrikeQuote?> FindQuoteByInvoiceId(string invoiceId)
 	{
 		return await _db.Quotes
 			.FirstOrDefaultAsync(x => x.TenantId == TenantId && x.InvoiceId == invoiceId);
 	}
 
-	public async Task<StrikeQuote?> FindByPaymentHash(string paymentHash)
+	public async Task<StrikeQuote?> FindQuoteByPaymentHash(string paymentHash)
 	{
 		return await _db.Quotes
 			.FirstOrDefaultAsync(x => x.TenantId == TenantId && x.PaymentHash == paymentHash);
+	}
+
+	public async Task<StrikePayment?> FindPaymentByPaymentHash(string paymentHash)
+	{
+		return await _db.Payments
+			.FirstOrDefaultAsync(x => x.TenantId == TenantId && x.PaymentHash == paymentHash);
+	}
+
+	public async Task<StrikePayment[]> GetPayments(bool onlyCompleted, int offset = 0)
+	{
+		return await _db.Payments
+			.Where(x => x.TenantId == TenantId)
+			.Where(x => onlyCompleted && x.CompletedAt != null)
+			.OrderByDescending(x => x.CreatedAt)
+			.Skip(offset)
+			.ToArrayAsync();
 	}
 
 	public async Task Store(IHasTenantId entity)

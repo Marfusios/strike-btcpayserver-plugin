@@ -12,6 +12,7 @@ public class StrikeDbContext : DbContext
 	}
 
 	public DbSet<StrikeQuote> Quotes => Set<StrikeQuote>();
+	public DbSet<StrikePayment> Payments => Set<StrikePayment>();
 
 	protected override void OnModelCreating(ModelBuilder modelBuilder)
 	{

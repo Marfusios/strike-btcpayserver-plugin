@@ -87,9 +87,9 @@ public class StrikeLightningConnectionStringHandler : ILightningConnectionString
 		db.TenantId = tenantId;
 
 		var client = _serviceProvider.GetRequiredService<StrikeClient>();
-		client.ThrowOnError = true;
 		client.ApiKey = apiKey;
 		client.Environment = environment;
+		client.ThrowOnError = false;
 
 		if (serverUrl != null)
 			client.ServerUrl = serverUrl;
@@ -101,18 +101,18 @@ public class StrikeLightningConnectionStringHandler : ILightningConnectionString
 		if (accountFiatCurrency == null)
 			return null;
 
-		Currency targetReceivingCurrency;
+		Currency targetOperatingCurrency;
 		if ("fiat".Equals(currencyStr, StringComparison.OrdinalIgnoreCase))
 		{
-			targetReceivingCurrency = accountFiatCurrency.Value;
+			targetOperatingCurrency = accountFiatCurrency.Value;
 		}
-		else if (!Enum.TryParse(currencyStr, true, out targetReceivingCurrency))
+		else if (!Enum.TryParse(currencyStr, true, out targetOperatingCurrency))
 		{
 			error = "The key 'currency' is invalid, set either 'BTC', 'FIAT' or 'USD'/'EUR'";
 			return null;
 		}
 
-		return new StrikeLightningClient(client, db, accountFiatCurrency.Value, targetReceivingCurrency, network, logger);
+		return new StrikeLightningClient(client, db, accountFiatCurrency.Value, targetOperatingCurrency, network, logger);
 	}
 
 	private Currency? GetAccountFiatCurrency(string connectionKey, StrikeClient client, ref string? error)
