@@ -22,11 +22,11 @@ It allows using [Strike Wallet](https://strike.me) account as the lightning prov
 > :warning: **Owner of this BTCPayServer instance can access your API key.** 
 > Therefore they could spend your Strike balance if **Sending payments** scopes are selected
 
-![ApiKey](docs/api_key.png)
+![ApiKey](docs/api_key_dark.png)
 
-- Install Strike plugin from `Manage Plugins` page (or ask BTCPayServer admin)
+- Install Strike plugin from the `Manage Plugins` page (or ask a BTCPayServer admin)
 
-![Install Strike plugin](docs/install.png)
+![Install Strike plugin](docs/install_dark.png)
 
 - Then go to `BTCPayServer > Lightning > Settings > "Change connection" > "Use custom node"` and configure Strike connection. Follow this format: 
 
@@ -37,6 +37,6 @@ It allows using [Strike Wallet](https://strike.me) account as the lightning prov
     Where xxx is your API key. 
     Select **FIAT** if you want to automatically convert received bitcoins into fiat currency. Otherwise choose **BTC**.
 
-![Setup Strike connection](docs/setup.png)
+![Setup Strike connection](docs/setup_dark.png)
 
 **Pull Requests are welcome!**
