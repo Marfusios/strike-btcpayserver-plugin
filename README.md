@@ -1,7 +1,7 @@
 ![Logo](strike_wide.png)
 # Strike BTCPayServer Plugin
 
-Allows to use a [Strike Wallet](https://strike.me) account as the lightning provider for BTCPay Server.
+It allows using [Strike Wallet](https://strike.me) account as the lightning provider for the BTCPay Server.
 
 [Releases and breaking changes](https://github.com/Marfusios/strike-btcpayserver-plugin/releases)
 
@@ -11,7 +11,8 @@ Allows to use a [Strike Wallet](https://strike.me) account as the lightning prov
 ### Features
 
 - Receiving lightning payments directly to Strike Wallet
-- Settlement into fiat currency
+- BTC price hedge - settlement into fiat currency
+- Lightning Network liquidity managed by Strike
 
 ### Usage
 
@@ -23,15 +24,19 @@ Allows to use a [Strike Wallet](https://strike.me) account as the lightning prov
 
 ![ApiKey](docs/api_key.png)
 
-- Then go to BTCPayServer > Lightning > Settings > "Change connection" > "Use custom node" and configure Strike connection. Follow this format: 
+- Install Strike plugin from `Manage Plugins` page (or ask BTCPayServer admin)
 
-```
-type=strike;currency=FIAT;api-key=xxx...
-```
+![Install Strike plugin](docs/install.png)
 
-Where xxx is your API key. 
-Select **FIAT** if you want to automatically convert received bitcoins into fiat currency. Otherwise choose **BTC**.
+- Then go to `BTCPayServer > Lightning > Settings > "Change connection" > "Use custom node"` and configure Strike connection. Follow this format: 
 
-![ApiKey](docs/setup.png)
+    ```
+    type=strike;currency=FIAT;api-key=xxx
+    ```
+
+    Where xxx is your API key. 
+    Select **FIAT** if you want to automatically convert received bitcoins into fiat currency. Otherwise choose **BTC**.
+
+![Setup Strike connection](docs/setup.png)
 
 **Pull Requests are welcome!**
