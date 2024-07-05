@@ -187,14 +187,33 @@ public partial class StrikeLightningClient
 			if (quote == null)
 				return null;
 
-			var parsedInvoice = BOLT11PaymentRequest.Parse(quote.LightningInvoice, _network);
-			var status = TranslateStatus(invoice.State, quote.ExpiresAt);
+			var converted = ConvertInvoice(invoice, quote);
+			if (converted == null)
+				return null;
 
+			var status = TranslateStatus(invoice.State, quote.ExpiresAt);
 			if (status == LightningInvoiceStatus.Paid && !quote.Paid)
 			{
 				quote.Paid = true;
 				await storage.Store(quote);
 			}
+
+			return converted;
+		}
+		catch (Exception e)
+		{
+			_logger.LogWarning(e, "Failed to convert invoice {invoiceId}, error: {errorMessage}", invoice?.InvoiceId, e.Message);
+			return null;
+		}
+	}
+
+	private LightningInvoice? ConvertInvoice(Invoice invoice, StrikeQuote quote)
+	{
+		try
+		{
+			var invoiceId = invoice.InvoiceId.ToString();
+			var parsedInvoice = BOLT11PaymentRequest.Parse(quote.LightningInvoice, _network);
+			var status = TranslateStatus(invoice.State, quote.ExpiresAt);
 
 			return new LightningInvoice
 			{
