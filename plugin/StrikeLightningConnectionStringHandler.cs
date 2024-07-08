@@ -25,6 +25,9 @@ public class StrikeLightningConnectionStringHandler : ILightningConnectionString
 		_serviceProvider = serviceProvider;
 		_loggerFactory = loggerFactory;
 	}
+	
+	private StrikeLightningClient _latest;
+	public StrikeLightningClient Latest => _latest;
 
 	public ILightningClient? Create(string connectionString, Network network, out string? error)
 	{
@@ -123,8 +126,9 @@ public class StrikeLightningConnectionStringHandler : ILightningConnectionString
 			return null;
 		}
 
-		return new StrikeLightningClient(client, db, accountFiatCurrency.Value, targetOperatingCurrency, 
+		_latest = new StrikeLightningClient(client, db, accountFiatCurrency.Value, targetOperatingCurrency, 
 			network, logger, convertToCurrency);
+		return _latest;
 	}
 
 	private Currency? GetAccountFiatCurrency(string connectionKey, StrikeClient client, ref string? error)
