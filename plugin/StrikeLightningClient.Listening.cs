@@ -8,6 +8,7 @@ using BTCPayServer.Plugins.Strike.Persistence;
 using ExchangeSharp;
 using Microsoft.Extensions.Logging;
 using NBXplorer;
+using Strike.Client.CurrencyExchanges;
 using Strike.Client.Invoices;
 using Strike.Client.Models;
 
@@ -18,6 +19,14 @@ public partial class StrikeLightningClient
 	public Task<ILightningInvoiceListener> Listen(CancellationToken cancellation = new())
 	{
 		return Task.FromResult<ILightningInvoiceListener>(new Listener(this));
+	}
+
+	public async Task<bool> ExecCurrencyConversion(CurrencyExchangeQuoteReq req, CancellationToken cancellation = new())
+	{
+		var resp = await _client.CurrencyExchanges.PostCurrencyExchangeQuote(req);
+		var exec = await _client.CurrencyExchanges.PatchExecuteQuote(resp.Id);
+
+		return exec.IsSuccessStatusCode;
 	}
 
 	private class Listener : ILightningInvoiceListener
@@ -78,6 +87,8 @@ public partial class StrikeLightningClient
 
 				quote.Paid = invoice.Status == LightningInvoiceStatus.Paid;
 				quote.Observed = true;
+				
+				// if convertTo is different currency, label this payment to execute conversion
 				if (_client._convertToCurrency != Currency.Undefined &&
 				    _client._convertToCurrency.ToStringUpperInvariant() != quote.TargetCurrency)
 				{
