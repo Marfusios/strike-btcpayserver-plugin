@@ -17,16 +17,19 @@ public partial class StrikeLightningClient : ILightningClient
 {
 	private readonly StrikeClient _client;
 	private readonly StrikeStorageFactory _db;
+	private readonly Currency _accountFiatCurrency;
 	private readonly Currency _targetOperatingCurrency;
 	private readonly Network _network;
 	private readonly ILogger _logger;
 	private readonly Currency _convertToCurrency;
 
-	public StrikeLightningClient(StrikeClient client, StrikeStorageFactory db, Currency targetOperatingCurrency,
+	public StrikeLightningClient(StrikeClient client, StrikeStorageFactory db, 
+		Currency accountFiatCurrency, Currency targetOperatingCurrency,
 		Network network, ILogger logger, Currency convertToCurrency)
 	{
 		_client = client;
 		_db = db;
+		_accountFiatCurrency = accountFiatCurrency;
 		_targetOperatingCurrency = targetOperatingCurrency;
 		_network = network;
 		_logger = logger;

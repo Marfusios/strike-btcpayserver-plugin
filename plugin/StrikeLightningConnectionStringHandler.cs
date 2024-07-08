@@ -72,24 +72,8 @@ public class StrikeLightningConnectionStringHandler : ILightningConnectionString
 			return null;
 		}
 
-		if (!kv.TryGetValue("currency", out var currencyStr))
-		{
-			error = "The key 'currency' setting is not found";
-			return null;
-		}
-		// Currency targetOperatingCurrency;
-		// if ("fiat".Equals(currencyStr, StringComparison.OrdinalIgnoreCase))
-		// {
-		// 	targetOperatingCurrency = accountFiatCurrency.Value;
-		// }
-		// else if (!Enum.TryParse(currencyStr, true, out targetOperatingCurrency))
-		// {
-		// 	error = "The key 'currency' is invalid, set either 'BTC', 'FIAT' or 'USD'/'EUR'";
-		// 	return null;
-		// }
-
 		var convertToCurrency = Currency.Undefined;
-		if (kv.TryGetValue("convertTo", out var convertToCurrencyStr))
+		if (kv.TryGetValue("convertto", out var convertToCurrencyStr))
 		{
 			if (!Enum.TryParse(convertToCurrencyStr, true, out convertToCurrency))
 			{
@@ -120,8 +104,27 @@ public class StrikeLightningConnectionStringHandler : ILightningConnectionString
 		var accountFiatCurrency = GetAccountFiatCurrency(connectionHash, client, ref error);
 		if (accountFiatCurrency == null)
 			return null;
+		
+		
+		// figure out target currency
+		if (!kv.TryGetValue("currency", out var currencyStr))
+		{
+			error = "The key 'currency' setting is not found";
+			return null;
+		}
+		Currency targetOperatingCurrency;
+		if ("fiat".Equals(currencyStr, StringComparison.OrdinalIgnoreCase))
+		{
+			targetOperatingCurrency = accountFiatCurrency.Value;
+		}
+		else if (!Enum.TryParse(currencyStr, true, out targetOperatingCurrency))
+		{
+			error = "The key 'currency' is invalid, set either 'BTC', 'FIAT' or 'USD'/'EUR'";
+			return null;
+		}
 
-		return new StrikeLightningClient(client, db, accountFiatCurrency.Value, network, logger, convertToCurrency);
+		return new StrikeLightningClient(client, db, accountFiatCurrency.Value, targetOperatingCurrency, 
+			network, logger, convertToCurrency);
 	}
 
 	private Currency? GetAccountFiatCurrency(string connectionKey, StrikeClient client, ref string? error)
