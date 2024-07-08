@@ -53,7 +53,7 @@ public class StrikeQuote : IHasTenantId
 
 	public bool IsExpired => !Paid && ExpiresAt < DateTimeOffset.UtcNow;
 
-	public string PaidConvertTo { get; set; }
+	public string? PaidConvertTo { get; set; }
 }
 
 public class StrikeQuoteConfiguration : IEntityTypeConfiguration<StrikeQuote>
