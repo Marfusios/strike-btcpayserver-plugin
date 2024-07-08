@@ -26,6 +26,7 @@ public class StrikeLightningConnectionStringHandler : ILightningConnectionString
 		_loggerFactory = loggerFactory;
 	}
 	
+	// TODO: There has to be better way to fetch the reference to StrikeClient for StrikePluginHostedService
 	private StrikeLightningClient _latest;
 	public StrikeLightningClient Latest => _latest;
 

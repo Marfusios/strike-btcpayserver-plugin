@@ -17,6 +17,7 @@ public partial class StrikeLightningClient : ILightningClient
 {
 	private readonly StrikeClient _client;
 	private readonly StrikeStorageFactory _db;
+	// TODO: This is not used, consider removing
 	private readonly Currency _accountFiatCurrency;
 	private readonly Currency _targetOperatingCurrency;
 	private readonly Network _network;

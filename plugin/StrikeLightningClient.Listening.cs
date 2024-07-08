@@ -88,6 +88,9 @@ public partial class StrikeLightningClient
 				quote.Paid = invoice.Status == LightningInvoiceStatus.Paid;
 				quote.Observed = true;
 				
+				// TODO: Discuss if there is a better way to handle signaling; maybe even whole fetching of paid quotes
+				// now that we have StrikePluginHostedService with events
+				
 				// if convertTo is different currency, label this payment to execute conversion
 				if (_client._convertToCurrency != Currency.Undefined &&
 				    _client._convertToCurrency.ToStringUpperInvariant() != quote.TargetCurrency)
