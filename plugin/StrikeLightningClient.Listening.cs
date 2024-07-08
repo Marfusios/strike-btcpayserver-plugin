@@ -5,9 +5,11 @@ using System.Threading;
 using System.Threading.Tasks;
 using BTCPayServer.Lightning;
 using BTCPayServer.Plugins.Strike.Persistence;
+using ExchangeSharp;
 using Microsoft.Extensions.Logging;
 using NBXplorer;
 using Strike.Client.Invoices;
+using Strike.Client.Models;
 
 namespace BTCPayServer.Plugins.Strike;
 
@@ -76,6 +78,12 @@ public partial class StrikeLightningClient
 
 				quote.Paid = invoice.Status == LightningInvoiceStatus.Paid;
 				quote.Observed = true;
+				if (_client._convertToCurrency != Currency.Undefined &&
+				    _client._convertToCurrency.ToStringUpperInvariant() != quote.TargetCurrency)
+				{
+					quote.PaidConvertTo = _client._convertToCurrency.ToStringUpperInvariant();
+				}
+				
 				await storage.Store(quote);
 
 				_completedToBeReported.Remove(invoice);
