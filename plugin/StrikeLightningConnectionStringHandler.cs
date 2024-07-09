@@ -102,19 +102,7 @@ public class StrikeLightningConnectionStringHandler : ILightningConnectionString
 
 		var logger = _loggerFactory.CreateLogger<StrikeLightningClient>();
 
-		// figure out target currency
-		if (!kv.TryGetValue("currency", out var currencyStr))
-		{
-			error = "The key 'currency' setting is not found";
-			return null;
-		}
-		if (!Enum.TryParse(currencyStr, true, out Currency targetOperatingCurrency))
-		{
-			error = "The key 'currency' is invalid, set either 'BTC' or 'USD'/'EUR'";
-			return null;
-		}
-
-		_latest = new StrikeLightningClient(client, db, targetOperatingCurrency,
+		_latest = new StrikeLightningClient(client, db,
 			network, logger, convertToCurrency);
 		return _latest;
 	}

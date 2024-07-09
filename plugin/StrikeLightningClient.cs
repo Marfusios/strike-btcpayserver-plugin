@@ -17,19 +17,15 @@ public partial class StrikeLightningClient : ILightningClient
 {
 	private readonly StrikeClient _client;
 	private readonly StrikeStorageFactory _db;
-	// TODO: This is not used, consider removing
-	private readonly Currency _targetOperatingCurrency;
 	private readonly Network _network;
 	private readonly ILogger _logger;
 	private readonly Currency _convertToCurrency;
 
 	public StrikeLightningClient(StrikeClient client, StrikeStorageFactory db, 
-		Currency targetOperatingCurrency,
 		Network network, ILogger logger, Currency convertToCurrency)
 	{
 		_client = client;
 		_db = db;
-		_targetOperatingCurrency = targetOperatingCurrency;
 		_network = network;
 		_logger = logger;
 		_convertToCurrency = convertToCurrency;
@@ -37,11 +33,10 @@ public partial class StrikeLightningClient : ILightningClient
 
 	public override string ToString()
 	{
-		var targetCurrency = _targetOperatingCurrency.ToStringUpperInvariant();
 		var convertToCurrency = _convertToCurrency.ToStringUpperInvariant();
 		return _client.Environment == StrikeEnvironment.Custom ?
-			$"type=strike;currency={targetCurrency};convertTo={convertToCurrency};server={_client.ServerUrl};api-key={_client.ApiKey}" :
-			$"type=strike;currency={targetCurrency};convertTo={convertToCurrency};api-key={_client.ApiKey}";
+			$"type=strike;convertTo={convertToCurrency};server={_client.ServerUrl};api-key={_client.ApiKey}" :
+			$"type=strike;convertTo={convertToCurrency};api-key={_client.ApiKey}";
 	}
 
 	public Task<LightningNodeInformation> GetInfo(CancellationToken cancellation = new())

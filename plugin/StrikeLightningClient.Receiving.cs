@@ -81,7 +81,7 @@ public partial class StrikeLightningClient
 
 	private async Task<LightningInvoice> CreateInvoice(LightMoney amount, string? description, string? descriptionHash)
 	{
-		var invoiceAmount = await CalculateInvoiceAmount(amount);
+		var invoiceAmount = new Money { Amount = amount.ToUnit(LightMoneyUnit.BTC), Currency = Currency.Btc };
 		var invoice = await _client.Invoices.IssueInvoice(new InvoiceReq
 		{
 			Amount = invoiceAmount,
@@ -160,22 +160,6 @@ public partial class StrikeLightningClient
 
 	private static string? FindValue(string[][] dict, string searchWord) =>
 		dict.FirstOrDefault(x => x.Length > 1 && x[0].Contains(searchWord, StringComparison.OrdinalIgnoreCase))?[1];
-
-	private async Task<Money> CalculateInvoiceAmount(LightMoney amount)
-	{
-		var btcAmount = amount.ToUnit(LightMoneyUnit.BTC);
-		if (_targetOperatingCurrency == Currency.Btc)
-			return new Money { Amount = btcAmount, Currency = Currency.Btc };
-
-		var rates = await _client.Rates.GetRatesTicker();
-		var foundRate = rates.FirstOrDefault(x =>
-			x.TargetCurrency == _targetOperatingCurrency
-			&& x.SourceCurrency == Currency.Btc);
-		if (foundRate is not { Amount: > 0 })
-			throw new InvalidOperationException(
-				$"Cannot calculate invoice amount, rate for BTC/{_targetOperatingCurrency.ToStringUpperInvariant()} is unavailable");
-		return new Money { Amount = btcAmount * foundRate.Amount, Currency = _targetOperatingCurrency };
-	}
 
 	private async Task<LightningInvoice?> ConvertInvoice(Invoice invoice)
 	{
