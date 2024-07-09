@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.ExceptionServices;
 using System.Threading;
+using System.Threading.Channels;
 using System.Threading.Tasks;
 using BTCPayServer.Lightning;
 using BTCPayServer.Plugins.Strike.Persistence;
@@ -18,7 +20,9 @@ public partial class StrikeLightningClient
 {
 	public Task<ILightningInvoiceListener> Listen(CancellationToken cancellation = new())
 	{
-		return Task.FromResult<ILightningInvoiceListener>(new Listener(this));
+		var listener = new Listener(this);
+		listener.StartListening();
+		return Task.FromResult<ILightningInvoiceListener>(listener);
 	}
 
 	public async Task<bool> ExecCurrencyConversion(CurrencyExchangeQuoteReq req, CancellationToken cancellation = new())
@@ -32,7 +36,9 @@ public partial class StrikeLightningClient
 	private class Listener : ILightningInvoiceListener
 	{
 		private readonly StrikeLightningClient _client;
-		private readonly List<LightningInvoice> _completedToBeReported = new();
+		private readonly Channel<LightningInvoice> _invoices = Channel.CreateUnbounded<LightningInvoice>();
+		private readonly CancellationTokenSource _cts = new();
+		private Task? _listenLoop;
 
 		public Listener(StrikeLightningClient client)
 		{
@@ -41,77 +47,90 @@ public partial class StrikeLightningClient
 
 		public void Dispose()
 		{
+			if (_cts.IsCancellationRequested)
+				return;
+			_cts.Cancel();
+			_invoices.Writer.TryComplete();
+		}
+
+		internal void StartListening()
+		{
+			if (_listenLoop != null)
+				return;
+			_listenLoop = ListenLoop();
+		}
+
+		private async Task? ListenLoop()
+		{
+			var cancellation = _cts.Token;
+			try
+			{
+				while (!cancellation.IsCancellationRequested)
+				{
+					var completed = await GetCompleted(cancellation);
+					if (completed.Length == 0)
+					{
+						// nothing is paid or expired yet, let's wait a bit and restart cycle
+						await Task.Delay(TimeSpan.FromSeconds(2), cancellation);
+						continue;
+					}
+
+					foreach (var invoice in completed)
+					{
+						var storage = _client._db.ResolveStorage();
+						var quote = await storage.FindQuoteByInvoiceId(invoice.Id);
+						if (quote == null)
+							continue;
+
+						quote.Paid = invoice.Status == LightningInvoiceStatus.Paid;
+						quote.Observed = true;
+
+						// TODO: Discuss if there is a better way to handle signaling; maybe even whole fetching of paid quotes
+						// now that we have StrikePluginHostedService with events
+
+						// if convertTo is different currency, label this payment to execute conversion
+						if (_client._convertToCurrency != Currency.Undefined &&
+							_client._convertToCurrency.ToStringUpperInvariant() != quote.TargetCurrency)
+						{
+							quote.PaidConvertTo = _client._convertToCurrency.ToStringUpperInvariant();
+						}
+
+						if (_invoices.Writer.TryWrite(invoice))
+							await storage.Store(quote);
+					}
+				}
+			}
+			catch when (cancellation.IsCancellationRequested)
+			{
+
+			}
+			catch (Exception ex)
+			{
+				_invoices.Writer.TryComplete(ex);
+			}
+			finally
+			{
+				Dispose();
+			}
 		}
 
 		public async Task<LightningInvoice> WaitInvoice(CancellationToken cancellation)
 		{
 			try
 			{
-				return await ReturnCompletedOrEmpty(cancellation);
+				return await _invoices.Reader.ReadAsync(cancellation);
 			}
-			catch (Exception e)
+			catch (ChannelClosedException ex) when (ex.InnerException is null)
 			{
-				_client._logger.LogWarning(e, "Failed while listening for invoice status, error: {errorMessage}", e.Message);
-				_completedToBeReported.Clear();
-				await Task.Delay(TimeSpan.FromSeconds(5), cancellation);
+				throw new OperationCanceledException();
 			}
-
-			return EmptyResponse();
+			catch (ChannelClosedException ex) when (ex.InnerException is not null)
+			{
+				_client._logger.LogWarning(ex.InnerException, "Failed while listening for invoice status, error: {errorMessage}", ex.InnerException.Message);
+				ExceptionDispatchInfo.Capture(ex.InnerException).Throw();
+				throw;
+			}
 		}
-
-		private async Task<LightningInvoice> ReturnCompletedOrEmpty(CancellationToken cancellation)
-		{
-			if (_completedToBeReported.Count == 0)
-			{
-				var completed = await GetCompleted(cancellation);
-				if (completed.Length == 0)
-				{
-					// nothing is paid or expired yet, let's wait a bit and restart cycle
-					await Task.Delay(TimeSpan.FromSeconds(2), cancellation);
-					return EmptyResponse();
-				}
-
-				// store completed invoices and report them one by one
-				_completedToBeReported.AddRange(completed);
-			}
-
-			foreach (var invoice in _completedToBeReported.ToArray())
-			{
-				var storage = _client._db.ResolveStorage();
-				var quote = await storage.FindQuoteByInvoiceId(invoice.Id);
-				if (quote == null)
-				{
-					_completedToBeReported.Remove(invoice);
-					continue;
-				}
-
-				quote.Paid = invoice.Status == LightningInvoiceStatus.Paid;
-				quote.Observed = true;
-				
-				// TODO: Discuss if there is a better way to handle signaling; maybe even whole fetching of paid quotes
-				// now that we have StrikePluginHostedService with events
-				
-				// if convertTo is different currency, label this payment to execute conversion
-				if (_client._convertToCurrency != Currency.Undefined &&
-				    _client._convertToCurrency.ToStringUpperInvariant() != quote.TargetCurrency)
-				{
-					quote.PaidConvertTo = _client._convertToCurrency.ToStringUpperInvariant();
-				}
-				
-				await storage.Store(quote);
-
-				_completedToBeReported.Remove(invoice);
-				return invoice;
-			}
-
-			return EmptyResponse();
-		}
-
-		// BTCPayServer expects a non-null invoice to be returned
-		private static LightningInvoice EmptyResponse() => new()
-		{
-			Id = string.Empty
-		};
 
 		private async Task<LightningInvoice[]> GetCompleted(CancellationToken cancellation)
 		{
