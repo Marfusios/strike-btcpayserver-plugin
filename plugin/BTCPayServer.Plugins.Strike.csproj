@@ -54,8 +54,4 @@
 		<PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="8.0.0" />
 	</ItemGroup>
 
-	<ItemGroup>
-		<PackageReference Include="Westwind.AspNetCore.Markdown" Version="3.17.0" />
-	</ItemGroup>
-
 </Project>
