@@ -71,7 +71,7 @@ public partial class StrikeLightningClient
 					if (completed.Length == 0)
 					{
 						// nothing is paid or expired yet, let's wait a bit and restart cycle
-						await Task.Delay(TimeSpan.FromSeconds(2), cancellation);
+						await Task.Delay(TimeSpan.FromSeconds(1), cancellation);
 						continue;
 					}
 
