@@ -18,13 +18,15 @@ public class StrikeLightningConnectionStringHandler : ILightningConnectionString
 	private readonly IServiceProvider _serviceProvider;
 	private readonly ILoggerFactory _loggerFactory;
 
-	private readonly ConcurrentDictionary<string, Currency> _fiatCurrencyForConnection = new();
-
 	public StrikeLightningConnectionStringHandler(IServiceProvider serviceProvider, ILoggerFactory loggerFactory)
 	{
 		_serviceProvider = serviceProvider;
 		_loggerFactory = loggerFactory;
 	}
+	
+	// TODO: There has to be better way to fetch the reference to StrikeClient for StrikePluginHostedService
+	private StrikeLightningClient _latest;
+	public StrikeLightningClient Latest => _latest;
 
 	public ILightningClient? Create(string connectionString, Network network, out string? error)
 	{
@@ -72,10 +74,14 @@ public class StrikeLightningConnectionStringHandler : ILightningConnectionString
 			return null;
 		}
 
-		if (!kv.TryGetValue("currency", out var currencyStr))
+		var convertToCurrency = Currency.Undefined;
+		if (kv.TryGetValue("convertto", out var convertToCurrencyStr))
 		{
-			error = "The key 'currency' setting is not found";
-			return null;
+			if (!Enum.TryParse(convertToCurrencyStr, true, out convertToCurrency))
+			{
+				error = "The key 'convertTo' is invalid, set either 'BTC', 'USD', 'EUR'";
+				return null;
+			}
 		}
 
 		error = null;
@@ -96,49 +102,9 @@ public class StrikeLightningConnectionStringHandler : ILightningConnectionString
 
 		var logger = _loggerFactory.CreateLogger<StrikeLightningClient>();
 
-		var connectionHash = ComputeHash(connectionString);
-		var accountFiatCurrency = GetAccountFiatCurrency(connectionHash, client, ref error);
-		if (accountFiatCurrency == null)
-			return null;
-
-		Currency targetOperatingCurrency;
-		if ("fiat".Equals(currencyStr, StringComparison.OrdinalIgnoreCase))
-		{
-			targetOperatingCurrency = accountFiatCurrency.Value;
-		}
-		else if (!Enum.TryParse(currencyStr, true, out targetOperatingCurrency))
-		{
-			error = "The key 'currency' is invalid, set either 'BTC', 'FIAT' or 'USD'/'EUR'";
-			return null;
-		}
-
-		return new StrikeLightningClient(client, db, accountFiatCurrency.Value, targetOperatingCurrency, network, logger);
-	}
-
-	private Currency? GetAccountFiatCurrency(string connectionKey, StrikeClient client, ref string? error)
-	{
-		if (_fiatCurrencyForConnection.TryGetValue(connectionKey, out var cachedCurrency))
-			return cachedCurrency;
-
-		try
-		{
-			var balances = client.Balances.GetBalances().GetAwaiter().GetResult();
-			if (!balances.IsSuccessStatusCode)
-			{
-				var errorFromServer = balances.Error?.Data;
-				error = $"The connection failed, check api key. Error: {errorFromServer?.Code} {errorFromServer?.Message}";
-				return null;
-			}
-
-			var accountFiatCurrency = balances.FirstOrDefault(x => x.Currency != Currency.Btc)?.Currency ?? Currency.Usd;
-			_fiatCurrencyForConnection[connectionKey] = accountFiatCurrency;
-			return accountFiatCurrency;
-		}
-		catch (Exception e)
-		{
-			error = $"Invalid server or api key. Error: {e.Message}";
-			return null;
-		}
+		_latest = new StrikeLightningClient(client, db,
+			network, logger, convertToCurrency);
+		return _latest;
 	}
 
 	private static string ComputeHash(string value)

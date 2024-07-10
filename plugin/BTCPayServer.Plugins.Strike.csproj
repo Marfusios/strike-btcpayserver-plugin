@@ -34,6 +34,9 @@
 	<ItemGroup>
 		<EmbeddedResource Include="Resources\**" />
 		<ProjectReference Include="..\submodules\btcpayserver\BTCPayServer\BTCPayServer.csproj" />
+		<ProjectReference Include="..\submodules\strike-client\src\Strike.Client\Strike.Client.csproj">
+			<Private>true</Private>
+		</ProjectReference>
 	</ItemGroup>
 
 
@@ -41,8 +44,7 @@
 		<AdditionalFiles Include="Views\Shared\Strike\LNPaymentMethodSetupTab.cshtml" />
 	</ItemGroup>
 
-
-	<ItemGroup>
+	<ItemGroup Condition="$(Configuration) != 'Release'">
 		<PackageReference Include="Microsoft.CodeAnalysis.Common" Version="4.9.2" />
 		<PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.9.2" />
 		<PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.6">
@@ -50,8 +52,6 @@
 			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 		</PackageReference>
 		<PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="8.0.0" />
-		<PackageReference Include="StrikeWallet.Client" Version="1.0.13" />
-		<PackageReference Include="Westwind.AspNetCore.Markdown" Version="3.17.0" />
 	</ItemGroup>
 
 </Project>

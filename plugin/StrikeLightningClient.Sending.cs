@@ -88,7 +88,7 @@ public partial class StrikeLightningClient
 		var paymentQuote = await _client.PaymentQuotes.CreateLnQuote(new LnPaymentQuoteReq
 		{
 			LnInvoice = bolt11,
-			SourceCurrency = _targetOperatingCurrency,
+			SourceCurrency = Currency.Btc,
 			Amount = !hasAmount ? new Money
 			{
 				Currency = Currency.Btc,

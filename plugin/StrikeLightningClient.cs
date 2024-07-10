@@ -15,30 +15,28 @@ namespace BTCPayServer.Plugins.Strike;
 
 public partial class StrikeLightningClient : ILightningClient
 {
-	private readonly ILogger _logger;
 	private readonly StrikeClient _client;
-	private readonly Currency _accountFiatCurrency;
-	private readonly Currency _targetOperatingCurrency;
-	private readonly Network _network;
 	private readonly StrikeStorageFactory _db;
+	private readonly Network _network;
+	private readonly ILogger _logger;
+	private readonly Currency _convertToCurrency;
 
-	public StrikeLightningClient(StrikeClient client, StrikeStorageFactory db, Currency accountFiatCurrency, Currency targetOperatingCurrency,
-		Network network, ILogger logger)
+	public StrikeLightningClient(StrikeClient client, StrikeStorageFactory db, 
+		Network network, ILogger logger, Currency convertToCurrency)
 	{
-		_logger = logger;
+		_client = client;
 		_db = db;
 		_network = network;
-		_targetOperatingCurrency = targetOperatingCurrency;
-		_accountFiatCurrency = accountFiatCurrency;
-		_client = client;
+		_logger = logger;
+		_convertToCurrency = convertToCurrency;
 	}
 
 	public override string ToString()
 	{
-		var currency = _targetOperatingCurrency.ToStringUpperInvariant();
+		var convertToCurrency = _convertToCurrency.ToStringUpperInvariant();
 		return _client.Environment == StrikeEnvironment.Custom ?
-			$"type=strike;currency={currency};server={_client.ServerUrl};api-key={_client.ApiKey}" :
-			$"type=strike;currency={currency};api-key={_client.ApiKey}";
+			$"type=strike;convertTo={convertToCurrency};server={_client.ServerUrl};api-key={_client.ApiKey}" :
+			$"type=strike;convertTo={convertToCurrency};api-key={_client.ApiKey}";
 	}
 
 	public Task<LightningNodeInformation> GetInfo(CancellationToken cancellation = new())

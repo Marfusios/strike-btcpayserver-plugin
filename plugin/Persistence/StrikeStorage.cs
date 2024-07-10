@@ -28,6 +28,15 @@ public class StrikeStorage
 			.ToArrayAsync(cancellation);
 	}
 
+	public async Task<StrikeQuote[]> GetPaidQuotesToConvert(CancellationToken cancellation)
+	{
+		ValidateTenantId();
+
+		return await _db.Quotes
+			.Where(x => x.TenantId == TenantId && x.PaidConvertTo != null && x.Observed && x.Paid)
+			.ToArrayAsync(cancellation);
+	}
+
 	public async Task<StrikeQuote?> FindQuoteByInvoiceId(string invoiceId)
 	{
 		return await _db.Quotes
