@@ -8,8 +8,8 @@
 	<!-- Plugin specific properties -->
 	<PropertyGroup>
 		<Product>Strike</Product>
-		<Description>Strike as a lightning provider</Description>
-		<Version>1.1.1</Version>
+		<Description>Strike as a lightning provider, Rockstar Fork</Description>
+		<Version>1.1.2</Version>
 		<CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
 		<RootNamespace>BTCPayServer.Plugins.Strike</RootNamespace>
 	</PropertyGroup>
