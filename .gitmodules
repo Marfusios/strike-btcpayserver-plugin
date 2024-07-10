@@ -3,4 +3,4 @@
 	url = https://github.com/btcpayserver/btcpayserver
 [submodule "submodules/strike-client"]
 	path = submodules/strike-client
-url=git@github.com:rockstardev/strike-client.git
+url=https://github.com/rockstardev/strike-client.git
