@@ -149,7 +149,7 @@ public class StrikePluginHostedService : EventHostedServiceBase, IDisposable
 
 		foreach (var bulk in bulks)
 		{ 
-			var invoiceIds = string.Join(',', bulk.Select(a=>$"'{a.InvoiceId}'"));
+			var invoiceIds = string.Join(',', bulk.Select(a=>a.InvoiceId));
 			var filter = $"invoiceId in ({invoiceIds})";
 			var collection = await client.Client.Invoices.GetInvoices(filter);
 			
