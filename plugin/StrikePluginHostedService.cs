@@ -133,21 +133,21 @@ public class StrikePluginHostedService : EventHostedServiceBase, IDisposable
 		await db.SaveChangesAsync(_cts.Token);
 	}		
 
-	private async Task<Invoice[]> queryStrikeApi(StrikeLightningClient client, StrikeQuote[] quotes)
+	private async Task<List<Invoice>> queryStrikeApi(StrikeLightningClient client, StrikeQuote[] quotes)
 	{
 		var bulks = quotes.Batch(100);
 		var invoices = new List<Invoice>();
 
 		foreach (var bulk in bulks)
-		{
-			var ids = bulk.Select(x => Guid.Parse(x.InvoiceId)).ToArray();
-			var collection = await client.Client.Invoices.GetInvoices(builder => builder
-				.Filter((e, f, o) => o.In(e.InvoiceId, ids))
-				.OrderByDescending(x => x.Created));
+		{ 
+			var invoiceIds = string.Join(',', bulk.Select((a=>$"'{a.InvoiceId}'")));
+			var filter = $"invoiceId in ({invoiceIds})";
+			var collection = await client.Client.Invoices.GetInvoices(filter);
+			
 			invoices.AddRange(collection.Items);
 		}
 
-		return invoices.ToArray();
+		return invoices;
 	}
 	
 	
