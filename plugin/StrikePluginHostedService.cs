@@ -52,6 +52,16 @@ public class StrikePluginHostedService : EventHostedServiceBase, IDisposable
 			try
 			{
 				await using var db = _dbContextFactory.CreateContext();
+				
+				// mark expired quotes as observed
+				var expiredQuotes = db.Quotes.Where(a => 
+					!a.Observed && !a.Paid && a.ExpiresAt < DateTimeOffset.UtcNow);
+				foreach (var expired in expiredQuotes)
+					expired.Observed = true;
+				
+				await db.SaveChangesAsync(_cts.Token);
+				
+				// update quotes that are waiting for payment
 				var waitingQuotes = await db.Quotes.Where(a => !a.Observed && !a.Paid).ToArrayAsync(cancellation);
 
 				var distinctTenants = waitingQuotes.Select(b => b.TenantId).Distinct().ToArray();
@@ -119,9 +129,9 @@ public class StrikePluginHostedService : EventHostedServiceBase, IDisposable
 			}
 		}
 		
-		// handling unpaid invoices
-		foreach (var invoice in invoices.Where(a => a.State != InvoiceState.Paid && 
-		                                            a.State != InvoiceState.Unpaid))
+		// handling invoices that are explicity cancelled...
+		foreach (var invoice in invoices.Where(a => 
+			         a.State is InvoiceState.Canceled or InvoiceState.Reversed or InvoiceState.Undefined))
 		{
 				var quote = await db.Quotes.SingleOrDefaultAsync(a => a.InvoiceId == invoice.InvoiceId.ToString());
 				if (quote == null)
@@ -129,7 +139,6 @@ public class StrikePluginHostedService : EventHostedServiceBase, IDisposable
 
 				quote.Observed = true;
 		}
-
 		await db.SaveChangesAsync(_cts.Token);
 	}		
 
@@ -140,7 +149,7 @@ public class StrikePluginHostedService : EventHostedServiceBase, IDisposable
 
 		foreach (var bulk in bulks)
 		{ 
-			var invoiceIds = string.Join(',', bulk.Select((a=>$"'{a.InvoiceId}'")));
+			var invoiceIds = string.Join(',', bulk.Select(a=>$"'{a.InvoiceId}'"));
 			var filter = $"invoiceId in ({invoiceIds})";
 			var collection = await client.Client.Invoices.GetInvoices(filter);
 			
