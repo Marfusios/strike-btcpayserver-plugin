@@ -9,7 +9,7 @@
 	<PropertyGroup>
 		<Product>Strike</Product>
 		<Description>Strike as a lightning provider, Rockstar Fork</Description>
-		<Version>1.1.3</Version>
+		<Version>1.1.4</Version>
 		<CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
 		<RootNamespace>BTCPayServer.Plugins.Strike</RootNamespace>
 	</PropertyGroup>
