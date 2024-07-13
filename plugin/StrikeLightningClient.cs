@@ -16,19 +16,23 @@ namespace BTCPayServer.Plugins.Strike;
 public partial class StrikeLightningClient : ILightningClient
 {
 	private readonly StrikeClient _client;
-	private readonly StrikeStorageFactory _db;
+	public StrikeClient Client => _client;
+	private readonly StrikeDbContextFactory _dbContextFactory;
+	public StrikeDbContextFactory DbContextFactory => _dbContextFactory;
 	private readonly Network _network;
 	private readonly ILogger _logger;
 	private readonly Currency _convertToCurrency;
+	private readonly string _tenantId;
 
-	public StrikeLightningClient(StrikeClient client, StrikeStorageFactory db, 
-		Network network, ILogger logger, Currency convertToCurrency)
+	public StrikeLightningClient(StrikeClient client, StrikeDbContextFactory dbContextFactory, 
+		Network network, ILogger logger, Currency convertToCurrency, string tenantId)
 	{
 		_client = client;
-		_db = db;
+		_dbContextFactory = dbContextFactory;
 		_network = network;
 		_logger = logger;
 		_convertToCurrency = convertToCurrency;
+		_tenantId = tenantId;
 	}
 
 	public override string ToString()

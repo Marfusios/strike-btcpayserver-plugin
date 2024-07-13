@@ -6,16 +6,19 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
 namespace BTCPayServer.Plugins.Strike.Persistence;
-public class StrikeStorage
+public class StrikeStorageRemoved : IDisposable, IAsyncDisposable
 {
 	private readonly ILogger _logger;
 	private readonly StrikeDbContext _db;
 
-	public StrikeStorage(StrikeDbContext db, ILogger logger)
+	public StrikeStorageRemoved(StrikeDbContext db, ILogger logger)
 	{
 		_db = db;
 		_logger = logger;
 	}
+
+	public void Dispose() => _db.Dispose();
+	public async ValueTask DisposeAsync() => await _db.DisposeAsync();
 
 	public string TenantId { get; set; } = string.Empty;
 

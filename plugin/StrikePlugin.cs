@@ -24,6 +24,7 @@ public class StrikePlugin : BaseBTCPayServerPlugin
 
 		applicationBuilder.AddSingleton<ILightningConnectionStringHandler>(provider => provider.GetRequiredService<StrikeLightningConnectionStringHandler>());
 		applicationBuilder.AddSingleton<StrikeLightningConnectionStringHandler>();
+		applicationBuilder.AddSingleton<StrikeLightningClientFactory>();
 
 		applicationBuilder.AddSingleton<StrikeDbContextFactory>();
 		applicationBuilder.AddDbContext<StrikeDbContext>((provider, o) =>
@@ -32,9 +33,6 @@ public class StrikePlugin : BaseBTCPayServerPlugin
 			factory.ConfigureBuilder(o);
 		});
 		applicationBuilder.AddHostedService<StrikeDbContextMigrator>();
-
-		applicationBuilder.AddSingleton<StrikeStorageFactory>();
-		applicationBuilder.AddTransient<StrikeStorage>();
 
 		applicationBuilder.AddStrikeHttpClient();
 		applicationBuilder.AddStrikeClient();

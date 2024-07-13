@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using BTCPayServer.Lightning;
 using BTCPayServer.Plugins.Strike.Persistence;
 using ExchangeSharp;
+using Microsoft.EntityFrameworkCore;
 using Strike.Client;
 using Strike.Client.Errors;
 using Strike.Client.Models;
@@ -18,8 +19,9 @@ public partial class StrikeLightningClient
 {
 	public async Task<LightningPayment?> GetPayment(string paymentHash, CancellationToken cancellation = new())
 	{
-		var storage = _db.ResolveStorage();
-		var found = await storage.FindPaymentByPaymentHash(paymentHash);
+		await using var db = _dbContextFactory.CreateContext();
+		var found = await db.Payments
+			.FirstOrDefaultAsync(x => x.TenantId == _tenantId && x.PaymentHash == paymentHash, cancellationToken: cancellation);
 		if (found == null)
 			return null;
 
@@ -36,7 +38,7 @@ public partial class StrikeLightningClient
 			found.Status = status;
 			found.CompletedAt = payment.Completed;
 			found.RealBtcFeeAmount = realLnFee.ToUnit(LightMoneyUnit.BTC);
-			await storage.Store(found);
+			await db.SaveChangesAsync(cancellation);
 		}
 
 		return new LightningPayment
@@ -58,7 +60,8 @@ public partial class StrikeLightningClient
 
 	public async Task<LightningPayment[]> ListPayments(ListPaymentsParams? request, CancellationToken cancellation = new())
 	{
-		var payments = await _db.ResolveStorage().GetPayments(request?.IncludePending == false, (int?)request?.OffsetIndex ?? 0);
+		await using var db = _dbContextFactory.CreateContext();
+		var payments = await GetPayments(db, _tenantId, request?.IncludePending == false, (int?)request?.OffsetIndex ?? 0);
 		return payments
 			.Select(x => new LightningPayment
 			{
@@ -71,6 +74,18 @@ public partial class StrikeLightningClient
 				Status = x.Status
 			})
 			.ToArray();
+	}
+	
+	
+
+	public async Task<StrikePayment[]> GetPayments(StrikeDbContext db, string tenantId, bool onlyCompleted, int offset = 0)
+	{
+		return await db.Payments
+			.Where(x => x.TenantId == _tenantId)
+			.Where(x => onlyCompleted && x.CompletedAt != null)
+			.OrderByDescending(x => x.CreatedAt)
+			.Skip(offset)
+			.ToArrayAsync();
 	}
 
 	public Task<PayResponse> Pay(PayInvoiceParams payParams, CancellationToken cancellation = new())
@@ -122,7 +137,10 @@ public partial class StrikeLightningClient
 			ConversionRate = payment.ConversionRate?.Amount,
 			Status = realStatus
 		};
-		await _db.ResolveStorage().Store(entity);
+		
+		await using var db = _dbContextFactory.CreateContext();
+		db.Payments.Add(entity);
+		await db.SaveChangesAsync(cancellation);
 
 		return new PayResponse
 		{

@@ -23,10 +23,6 @@ public class StrikeLightningConnectionStringHandler : ILightningConnectionString
 		_serviceProvider = serviceProvider;
 		_loggerFactory = loggerFactory;
 	}
-	
-	// TODO: There has to be better way to fetch the reference to StrikeClient for StrikePluginHostedService
-	private StrikeLightningClient _latest;
-	public StrikeLightningClient Latest => _latest;
 
 	public ILightningClient? Create(string connectionString, Network network, out string? error)
 	{
@@ -49,6 +45,12 @@ public class StrikeLightningConnectionStringHandler : ILightningConnectionString
 			error = null;
 			return null;
 		}
+		
+		if (!kv.TryGetValue("api-key", out var apiKey))
+		{
+			error = "The key 'api-key' is not found";
+			return null;
+		}
 
 		var environment = network.Name switch
 		{
@@ -68,12 +70,6 @@ public class StrikeLightningConnectionStringHandler : ILightningConnectionString
 			}
 		}
 
-		if (!kv.TryGetValue("api-key", out var apiKey))
-		{
-			error = "The key 'api-key' is not found";
-			return null;
-		}
-
 		var convertToCurrency = Currency.Undefined;
 		if (kv.TryGetValue("convertto", out var convertToCurrencyStr))
 		{
@@ -83,15 +79,20 @@ public class StrikeLightningConnectionStringHandler : ILightningConnectionString
 				return null;
 			}
 		}
-
+		
 		error = null;
+		
+		// if we already have a client for this tenant, return it
+		var tenantId = ComputeHash(connectionString.Trim().ToLowerInvariant());
+		var holder = _serviceProvider.GetRequiredService<StrikeLightningClientFactory>();
+		var existingClient = holder.GetClient(tenantId);
+		if (existingClient != null)
+		{
+			return existingClient;
+		}
 
-		// TODO: use StoreId instead (but how to get it?)
-		var tenantId = ComputeHash(apiKey);
-
-		var db = _serviceProvider.GetRequiredService<StrikeStorageFactory>();
-		db.TenantId = tenantId;
-
+		
+		// initialize client
 		var client = _serviceProvider.GetRequiredService<StrikeClient>();
 		client.ApiKey = apiKey;
 		client.Environment = environment;
@@ -100,11 +101,12 @@ public class StrikeLightningConnectionStringHandler : ILightningConnectionString
 		if (serverUrl != null)
 			client.ServerUrl = serverUrl;
 
+		// initialize lightning client that listens on top of StrikeClient
 		var logger = _loggerFactory.CreateLogger<StrikeLightningClient>();
-
-		_latest = new StrikeLightningClient(client, db,
-			network, logger, convertToCurrency);
-		return _latest;
+		var dbContextFactory = _serviceProvider.GetRequiredService<StrikeDbContextFactory>();
+		
+		holder.AddOrUpdateClient(tenantId, new StrikeLightningClient(client, dbContextFactory, network, logger, convertToCurrency, tenantId));
+		return holder.GetClient(tenantId);
 	}
 
 	private static string ComputeHash(string value)
