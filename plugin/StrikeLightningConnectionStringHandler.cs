@@ -18,8 +18,6 @@ public class StrikeLightningConnectionStringHandler : ILightningConnectionString
 	private readonly IServiceProvider _serviceProvider;
 	private readonly ILoggerFactory _loggerFactory;
 
-	private readonly ConcurrentDictionary<string, Currency> _fiatCurrencyForConnection = new();
-
 	public StrikeLightningConnectionStringHandler(IServiceProvider serviceProvider, ILoggerFactory loggerFactory)
 	{
 		_serviceProvider = serviceProvider;
@@ -47,6 +45,12 @@ public class StrikeLightningConnectionStringHandler : ILightningConnectionString
 			error = null;
 			return null;
 		}
+		
+		if (!kv.TryGetValue("api-key", out var apiKey))
+		{
+			error = "The key 'api-key' is not found";
+			return null;
+		}
 
 		var environment = network.Name switch
 		{
@@ -66,26 +70,29 @@ public class StrikeLightningConnectionStringHandler : ILightningConnectionString
 			}
 		}
 
-		if (!kv.TryGetValue("api-key", out var apiKey))
+		var convertToCurrency = Currency.Undefined;
+		if (kv.TryGetValue("convertto", out var convertToCurrencyStr))
 		{
-			error = "The key 'api-key' is not found";
-			return null;
+			if (!Enum.TryParse(convertToCurrencyStr, true, out convertToCurrency))
+			{
+				error = "The key 'convertTo' is invalid, set either 'BTC', 'USD', 'EUR'";
+				return null;
+			}
 		}
-
-		if (!kv.TryGetValue("currency", out var currencyStr))
-		{
-			error = "The key 'currency' setting is not found";
-			return null;
-		}
-
+		
 		error = null;
+		
+		// if we already have a client for this tenant, return it
+		var tenantId = ComputeHash(connectionString.Trim().ToLowerInvariant());
+		var holder = _serviceProvider.GetRequiredService<StrikeLightningClientFactory>();
+		var existingClient = holder.GetClient(tenantId);
+		if (existingClient != null)
+		{
+			return existingClient;
+		}
 
-		// TODO: use StoreId instead (but how to get it?)
-		var tenantId = ComputeHash(apiKey);
-
-		var db = _serviceProvider.GetRequiredService<StrikeStorageFactory>();
-		db.TenantId = tenantId;
-
+		
+		// initialize client
 		var client = _serviceProvider.GetRequiredService<StrikeClient>();
 		client.ApiKey = apiKey;
 		client.Environment = environment;
@@ -94,51 +101,12 @@ public class StrikeLightningConnectionStringHandler : ILightningConnectionString
 		if (serverUrl != null)
 			client.ServerUrl = serverUrl;
 
+		// initialize lightning client that listens on top of StrikeClient
 		var logger = _loggerFactory.CreateLogger<StrikeLightningClient>();
-
-		var connectionHash = ComputeHash(connectionString);
-		var accountFiatCurrency = GetAccountFiatCurrency(connectionHash, client, ref error);
-		if (accountFiatCurrency == null)
-			return null;
-
-		Currency targetOperatingCurrency;
-		if ("fiat".Equals(currencyStr, StringComparison.OrdinalIgnoreCase))
-		{
-			targetOperatingCurrency = accountFiatCurrency.Value;
-		}
-		else if (!Enum.TryParse(currencyStr, true, out targetOperatingCurrency))
-		{
-			error = "The key 'currency' is invalid, set either 'BTC', 'FIAT' or 'USD'/'EUR'";
-			return null;
-		}
-
-		return new StrikeLightningClient(client, db, accountFiatCurrency.Value, targetOperatingCurrency, network, logger);
-	}
-
-	private Currency? GetAccountFiatCurrency(string connectionKey, StrikeClient client, ref string? error)
-	{
-		if (_fiatCurrencyForConnection.TryGetValue(connectionKey, out var cachedCurrency))
-			return cachedCurrency;
-
-		try
-		{
-			var balances = client.Balances.GetBalances().GetAwaiter().GetResult();
-			if (!balances.IsSuccessStatusCode)
-			{
-				var errorFromServer = balances.Error?.Data;
-				error = $"The connection failed, check api key. Error: {errorFromServer?.Code} {errorFromServer?.Message}";
-				return null;
-			}
-
-			var accountFiatCurrency = balances.FirstOrDefault(x => x.Currency != Currency.Btc)?.Currency ?? Currency.Usd;
-			_fiatCurrencyForConnection[connectionKey] = accountFiatCurrency;
-			return accountFiatCurrency;
-		}
-		catch (Exception e)
-		{
-			error = $"Invalid server or api key. Error: {e.Message}";
-			return null;
-		}
+		var dbContextFactory = _serviceProvider.GetRequiredService<StrikeDbContextFactory>();
+		
+		holder.AddOrUpdateClient(tenantId, new StrikeLightningClient(client, dbContextFactory, network, logger, convertToCurrency, tenantId));
+		return holder.GetClient(tenantId);
 	}
 
 	private static string ComputeHash(string value)

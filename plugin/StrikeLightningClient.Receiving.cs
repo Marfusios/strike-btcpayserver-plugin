@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using BTCPayServer.Lightning;
 using BTCPayServer.Plugins.Strike.Persistence;
 using ExchangeSharp;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using NBitcoin;
 using Newtonsoft.Json;
@@ -29,7 +30,9 @@ public partial class StrikeLightningClient
 
 	public async Task<LightningInvoice?> GetInvoice(uint256 paymentHash, CancellationToken cancellation = new())
 	{
-		var found = await _db.ResolveStorage().FindQuoteByPaymentHash(paymentHash.ToString());
+		await using var db = _dbContextFactory.CreateContext();
+		var found = await db.Quotes
+			.FirstOrDefaultAsync(x => x.TenantId == _tenantId && x.PaymentHash == paymentHash.ToString(), cancellationToken: cancellation);
 		if (found == null)
 		{
 			return null;
@@ -81,7 +84,7 @@ public partial class StrikeLightningClient
 
 	private async Task<LightningInvoice> CreateInvoice(LightMoney amount, string? description, string? descriptionHash)
 	{
-		var invoiceAmount = await CalculateInvoiceAmount(amount);
+		var invoiceAmount = new Money { Amount = amount.ToUnit(LightMoneyUnit.BTC), Currency = Currency.Btc };
 		var invoice = await _client.Invoices.IssueInvoice(new InvoiceReq
 		{
 			Amount = invoiceAmount,
@@ -100,6 +103,7 @@ public partial class StrikeLightningClient
 
 		var entity = new StrikeQuote
 		{
+			TenantId = _tenantId,
 			InvoiceId = invoiceId,
 			LightningInvoice = quote.LnInvoice,
 			Description = invoice.Description,
@@ -112,7 +116,13 @@ public partial class StrikeLightningClient
 			TargetCurrency = invoice.Amount.Currency.ToStringUpperInvariant(),
 			ConversionRate = quote.ConversionRate.Amount
 		};
-		await _db.ResolveStorage().Store(entity);
+		if (_convertToCurrency != Currency.Undefined)
+			entity.PaidConvertTo = _convertToCurrency.ToStringUpperInvariant();
+
+		await using var db = _dbContextFactory.CreateContext();
+		
+		db.Quotes.Add(entity);
+		await db.SaveChangesAsync();
 
 		return new LightningInvoice
 		{
@@ -161,29 +171,15 @@ public partial class StrikeLightningClient
 	private static string? FindValue(string[][] dict, string searchWord) =>
 		dict.FirstOrDefault(x => x.Length > 1 && x[0].Contains(searchWord, StringComparison.OrdinalIgnoreCase))?[1];
 
-	private async Task<Money> CalculateInvoiceAmount(LightMoney amount)
-	{
-		var btcAmount = amount.ToUnit(LightMoneyUnit.BTC);
-		if (_targetOperatingCurrency == Currency.Btc)
-			return new Money { Amount = btcAmount, Currency = Currency.Btc };
-
-		var rates = await _client.Rates.GetRatesTicker();
-		var foundRate = rates.FirstOrDefault(x =>
-			x.TargetCurrency == _targetOperatingCurrency
-			&& x.SourceCurrency == Currency.Btc);
-		if (foundRate is not { Amount: > 0 })
-			throw new InvalidOperationException(
-				$"Cannot calculate invoice amount, rate for BTC/{_targetOperatingCurrency.ToStringUpperInvariant()} is unavailable");
-		return new Money { Amount = btcAmount * foundRate.Amount, Currency = _targetOperatingCurrency };
-	}
-
 	private async Task<LightningInvoice?> ConvertInvoice(Invoice invoice)
 	{
 		try
 		{
-			var storage = _db.ResolveStorage();
+			await using var db = _dbContextFactory.CreateContext();
+			
 			var invoiceId = invoice.InvoiceId.ToString();
-			var quote = await storage.FindQuoteByInvoiceId(invoiceId);
+			var quote = await db.Quotes
+				.FirstOrDefaultAsync(x => x.TenantId == _tenantId && x.InvoiceId == invoiceId);
 			if (quote == null)
 				return null;
 
@@ -195,7 +191,7 @@ public partial class StrikeLightningClient
 			if (status == LightningInvoiceStatus.Paid && !quote.Paid)
 			{
 				quote.Paid = true;
-				await storage.Store(quote);
+				await db.SaveChangesAsync();
 			}
 
 			return converted;

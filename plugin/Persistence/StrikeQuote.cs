@@ -1,6 +1,7 @@
 ﻿using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Strike.Client.Models;
 
 namespace BTCPayServer.Plugins.Strike.Persistence;
 public class StrikeQuote : IHasTenantId
@@ -51,6 +52,8 @@ public class StrikeQuote : IHasTenantId
 	public bool Observed { get; set; }
 
 	public bool IsExpired => !Paid && ExpiresAt < DateTimeOffset.UtcNow;
+
+	public string? PaidConvertTo { get; set; }
 }
 
 public class StrikeQuoteConfiguration : IEntityTypeConfiguration<StrikeQuote>

@@ -1,13 +1,19 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.ExceptionServices;
 using System.Threading;
+using System.Threading.Channels;
 using System.Threading.Tasks;
 using BTCPayServer.Lightning;
 using BTCPayServer.Plugins.Strike.Persistence;
+using ExchangeSharp;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using NBXplorer;
+using Strike.Client.CurrencyExchanges;
 using Strike.Client.Invoices;
+using Strike.Client.Models;
 
 namespace BTCPayServer.Plugins.Strike;
 
@@ -15,13 +21,21 @@ public partial class StrikeLightningClient
 {
 	public Task<ILightningInvoiceListener> Listen(CancellationToken cancellation = new())
 	{
-		return Task.FromResult<ILightningInvoiceListener>(new Listener(this));
+		var listener = new Listener(this);
+		return Task.FromResult<ILightningInvoiceListener>(listener);
+	}
+
+	public async Task<bool> ExecCurrencyConversion(CurrencyExchangeQuoteReq req, CancellationToken cancellation = new())
+	{
+		var resp = await _client.CurrencyExchanges.PostCurrencyExchangeQuote(req);
+		var exec = await _client.CurrencyExchanges.PatchExecuteQuote(resp.Id);
+
+		return exec.IsSuccessStatusCode;
 	}
 
 	private class Listener : ILightningInvoiceListener
 	{
 		private readonly StrikeLightningClient _client;
-		private readonly List<LightningInvoice> _completedToBeReported = new();
 
 		public Listener(StrikeLightningClient client)
 		{
@@ -34,108 +48,34 @@ public partial class StrikeLightningClient
 
 		public async Task<LightningInvoice> WaitInvoice(CancellationToken cancellation)
 		{
-			try
+			while (true)
 			{
-				return await ReturnCompletedOrEmpty(cancellation);
-			}
-			catch (Exception e)
-			{
-				_client._logger.LogWarning(e, "Failed while listening for invoice status, error: {errorMessage}", e.Message);
-				_completedToBeReported.Clear();
-				await Task.Delay(TimeSpan.FromSeconds(5), cancellation);
-			}
-
-			return EmptyResponse();
-		}
-
-		private async Task<LightningInvoice> ReturnCompletedOrEmpty(CancellationToken cancellation)
-		{
-			if (_completedToBeReported.Count == 0)
-			{
-				var completed = await GetCompleted(cancellation);
-				if (completed.Length == 0)
+				await using var db = _client.DbContextFactory.CreateContext();
+				var q = await db.Quotes.FirstOrDefaultAsync(a => a.TenantId == _client._tenantId && a.Paid && !a.Observed,
+					cancellationToken: cancellation);
+				if (q != null)
 				{
-					// nothing is paid or expired yet, let's wait a bit and restart cycle
-					await Task.Delay(TimeSpan.FromSeconds(2), cancellation);
-					return EmptyResponse();
+					var lightningInvoice = new LightningInvoice
+					{
+						Status = LightningInvoiceStatus.Paid,
+						Amount = new LightMoney(q.RequestedBtcAmount, LightMoneyUnit.BTC),
+						AmountReceived = new LightMoney(q.RequestedBtcAmount, LightMoneyUnit.BTC),
+						PaidAt = DateTimeOffset.Now,
+						PaymentHash = q.PaymentHash,
+						BOLT11 = q.LightningInvoice,
+						Id = q.InvoiceId,
+						ExpiresAt = q.ExpiresAt
+					};
+
+					q.Observed = true;
+					await db.SaveChangesAsync(cancellation);
+
+					return lightningInvoice;
 				}
-
-				// store completed invoices and report them one by one
-				_completedToBeReported.AddRange(completed);
+				
+				// if invoice is not returned, wait for a second before checking again
+				await Task.Delay(1000, cancellation);
 			}
-
-			foreach (var invoice in _completedToBeReported.ToArray())
-			{
-				var storage = _client._db.ResolveStorage();
-				var quote = await storage.FindQuoteByInvoiceId(invoice.Id);
-				if (quote == null)
-				{
-					_completedToBeReported.Remove(invoice);
-					continue;
-				}
-
-				quote.Paid = invoice.Status == LightningInvoiceStatus.Paid;
-				quote.Observed = true;
-				await storage.Store(quote);
-
-				_completedToBeReported.Remove(invoice);
-				return invoice;
-			}
-
-			return EmptyResponse();
-		}
-
-		// BTCPayServer expects a non-null invoice to be returned
-		private static LightningInvoice EmptyResponse() => new()
-		{
-			Id = string.Empty
-		};
-
-		private async Task<LightningInvoice[]> GetCompleted(CancellationToken cancellation)
-		{
-			var storage = _client._db.ResolveStorage();
-			var unobserved = await storage.GetUnobserved(cancellation);
-			if (unobserved.Length == 0)
-				return Array.Empty<LightningInvoice>();
-
-			var invoices = await QueryStrikeApi(unobserved);
-			var converted = ConvertToBtcPayFormat(invoices, unobserved).ToArray();
-			var completed = converted
-				.Where(x => x.Status != LightningInvoiceStatus.Unpaid)
-				.ToArray();
-			return completed;
-		}
-
-		private IEnumerable<LightningInvoice> ConvertToBtcPayFormat(Invoice[] invoices, StrikeQuote[] unobserved)
-		{
-			foreach (var invoice in invoices)
-			{
-				var quote = unobserved.FirstOrDefault(x => x.InvoiceId == invoice.InvoiceId.ToString());
-				if (quote == null)
-					continue;
-				var converted = _client.ConvertInvoice(invoice, quote);
-				if (converted == null)
-					continue;
-
-				yield return converted;
-			}
-		}
-
-		private async Task<Invoice[]> QueryStrikeApi(StrikeQuote[] unobserved)
-		{
-			var bulks = unobserved.Batch(100);
-			var invoices = new List<Invoice>();
-
-			foreach (var bulk in bulks)
-			{
-				var ids = bulk.Select(x => Guid.Parse(x.InvoiceId)).ToArray();
-				var collection = await _client._client.Invoices.GetInvoices(builder => builder
-					.Filter((e, f, o) => o.In(e.InvoiceId, ids))
-					.OrderByDescending(x => x.Created));
-				invoices.AddRange(collection.Items);
-			}
-
-			return invoices.ToArray();
 		}
 	}
 }

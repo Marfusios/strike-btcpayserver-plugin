@@ -1,35 +1,42 @@
 ﻿@using BTCPayServer
-@using Westwind.AspNetCore.Markdown
+
 @{
     ViewData.SetActivePage("Strike", "Configure", "Configure");
     var storeId = Context.GetCurrentStoreId();
-
-    async Task<string> GetDocumentationMarkdown()
-    {
-	    try
-	    {
-		    var documentationMarkdown = await Markdown.ParseFromUrlAsync("https://raw.githubusercontent.com/Marfusios/strike-btcpayserver-plugin/master/README.md");
-
-		    var text = documentationMarkdown ?? string.Empty;
-            var substring = "<h3 id=\"usage\">Usage</h3>";
-		    var substringLocation = text.IndexOf(substring, StringComparison.Ordinal);
-            if (substringLocation > 0)
-                text = text.Substring(substringLocation + substring.Length);
-
-            text = text.Replace("<p><strong>Pull Requests are welcome!</strong></p>", string.Empty);
-		    return text;
-	    }
-	    catch (Exception e)
-	    {
-		    return $"Failed to load documentation: {e.Message}";
-	    }
-    }
 }
 
 <div class="alert alert-success mb-4 text-break" role="alert">
     <span>
-        Configure Strike plugin <a href="/stores/@storeId/lightning/BTC/setup" class="link-secondary" style="text-decoration: underline">here</a>.
+		Configure Strike plugin <a asp-controller="UIStores" asp-action="SetupLightningNode" asp-route-storeId="@storeId" asp-route-cryptoCode="BTC" class="link-secondary" style="text-decoration: underline">here</a>.
     </span>
 </div>
 
-<div>@Markdown.ParseHtmlString(await GetDocumentationMarkdown())</div>
+<div>
+	<ul>
+		<li>Visit <a href="https://dashboard.strike.me/login">Strike Dashboard</a> and obtain API key. Select all scopes under <strong>Account</strong>, <strong>Receiving payments</strong> and <strong>Rates</strong>.</li>
+		<li>Optionally select scopes under <strong>Sending payments</strong> to enable payments triggered by BTCPayServer (payouts, BOLT cards, etc.)</li>
+	</ul>
+	<blockquote>
+		<p>
+			⚠️ <strong>Owner of this BTCPayServer instance can access your API key.</strong>
+			Therefore they could spend your Strike balance if <strong>Sending payments</strong> scopes are selected
+		</p>
+	</blockquote>
+	<p><img src="https://raw.githubusercontent.com/Marfusios/strike-btcpayserver-plugin/master/docs/api_key_dark.png" alt="ApiKey"></p>
+	<ul>
+		<li>Install Strike plugin from the <code>Manage Plugins</code> page (or ask a BTCPayServer admin)</li>
+	</ul>
+	<p><img src="https://raw.githubusercontent.com/Marfusios/strike-btcpayserver-plugin/master/docs/install_dark.png" alt="Install Strike plugin"></p>
+	<ul>
+		<li>
+			<p>Then go to <code>BTCPayServer &gt; Lightning &gt; Settings &gt; "Change connection" &gt; "Use custom node"</code> and configure Strike connection. Follow this format:</p>
+<pre><code>type=strike;currency=FIAT;api-key=xxx
+</code></pre>
+			<p>
+				Where xxx is your API key.
+				Select <strong>FIAT</strong> if you want to automatically convert received bitcoins into fiat currency. Otherwise choose <strong>BTC</strong>.
+			</p>
+		</li>
+	</ul>
+	<p><img src="https://raw.githubusercontent.com/Marfusios/strike-btcpayserver-plugin/master/docs/setup_dark.png" alt="Setup Strike connection"></p>
+</div>
