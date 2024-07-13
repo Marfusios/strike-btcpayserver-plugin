@@ -5,6 +5,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using BTCPayServer.Events;
 using BTCPayServer.HostedServices;
+using BTCPayServer.Payments;
+using BTCPayServer.Payments.Lightning;
 using BTCPayServer.Plugins.Strike.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -41,6 +43,7 @@ public class StrikePluginHostedService : EventHostedServiceBase, IDisposable
 	protected override void SubscribeToEvents()
 	{
 		_strikeApiListenLoop = StartStrikeApiLoop();
+		Subscribe<InvoiceEvent>();
 		base.SubscribeToEvents();
 	}
 
@@ -159,11 +162,26 @@ public class StrikePluginHostedService : EventHostedServiceBase, IDisposable
 		return invoices;
 	}
 	
-	
 
 	protected override async Task ProcessEvent(object evt, CancellationToken cancellationToken)
 	{
-		// Implement if needed
+		// handle expired invoices to stop listening on Strike Api
+		if (evt is InvoiceEvent { Name: InvoiceEvent.Expired } invoiceEvent)
+		{
+			var paymentMethod = new PaymentMethodId("BTC", PaymentTypes.LightningLike);
+			var pm = invoiceEvent.Invoice.GetPaymentMethod(paymentMethod);
+			if (pm?.GetPaymentMethodDetails() is LightningLikePaymentMethodDetails lightning)
+			{
+				await using var db = _dbContextFactory.CreateContext();
+				var quote = await db.Quotes.SingleOrDefaultAsync(a => a.InvoiceId == lightning.InvoiceId, cancellationToken: cancellationToken);
+				if (quote != null)
+				{
+					quote.Observed = true;
+					await db.SaveChangesAsync(cancellationToken);
+				}
+			}
+		}
+		
 		await base.ProcessEvent(evt, cancellationToken);
 	}
 }
