@@ -54,15 +54,9 @@ public class StrikePluginHostedService : EventHostedServiceBase, IDisposable
 		{
 			try
 			{
+				await cleanupOldExpiredQuotes();
+				
 				await using var db = _dbContextFactory.CreateContext();
-				
-				// mark expired quotes as observed
-				var expiredQuotes = db.Quotes.Where(a => 
-					!a.Observed && !a.Paid && a.ExpiresAt < DateTimeOffset.UtcNow);
-				foreach (var expired in expiredQuotes)
-					expired.Observed = true;
-				
-				await db.SaveChangesAsync(_cts.Token);
 				
 				// update quotes that are waiting for payment
 				var waitingQuotes = await db.Quotes.Where(a => !a.Observed && !a.Paid).ToArrayAsync(cancellation);
@@ -77,7 +71,7 @@ public class StrikePluginHostedService : EventHostedServiceBase, IDisposable
 					if (client == null)
 						continue;
 
-					await UpdateInvoicesForTenant(client, tenantQuotes);
+					await updateInvoicesForTenant(client, tenantQuotes);
 				}
 
 				await Task.Delay(1000, cancellation);
@@ -92,7 +86,20 @@ public class StrikePluginHostedService : EventHostedServiceBase, IDisposable
 		}
 	}
 
-	private async Task UpdateInvoicesForTenant(StrikeLightningClient client, StrikeQuote[] quotes)
+	// on old instances, we may have quotes that are expired but not observed... leaving this for extreme cases
+	private async Task cleanupOldExpiredQuotes()
+	{
+		await using var db = _dbContextFactory.CreateContext();
+		
+		var expiredQuotes = db.Quotes.Where(a => 
+			!a.Observed && !a.Paid && a.ExpiresAt < DateTimeOffset.UtcNow);
+		foreach (var expired in expiredQuotes)
+			expired.Observed = true;
+                
+		await db.SaveChangesAsync(_cts.Token);
+	}
+
+	private async Task updateInvoicesForTenant(StrikeLightningClient client, StrikeQuote[] quotes)
 	{
 		var invoices = await queryStrikeApi(client, quotes);
 		
