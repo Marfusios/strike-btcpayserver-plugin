@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -16,6 +16,8 @@ using Strike.Client.Invoices;
 using Strike.Client.Models;
 
 namespace BTCPayServer.Plugins.Strike;
+
+public record StrikePaidInvoice(string TenantId, Invoice Invoice);
 
 public class StrikePluginHostedService : EventHostedServiceBase, IDisposable
 {
@@ -114,7 +116,7 @@ public class StrikePluginHostedService : EventHostedServiceBase, IDisposable
 
 			// saving changes so that invoice listener can immediately pick up on this
 			await db.SaveChangesAsync();
-
+			EventAggregator.Publish(new StrikePaidInvoice(quote.TenantId, invoice));
 			// PROCESS CURRENCY CONVERSION
 			if (quote.PaidConvertTo != null)
 			{

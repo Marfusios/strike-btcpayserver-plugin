@@ -17,11 +17,13 @@ public class StrikeLightningConnectionStringHandler : ILightningConnectionString
 {
 	private readonly IServiceProvider _serviceProvider;
 	private readonly ILoggerFactory _loggerFactory;
+	private readonly EventAggregator _eventAggregator;
 
-	public StrikeLightningConnectionStringHandler(IServiceProvider serviceProvider, ILoggerFactory loggerFactory)
+	public StrikeLightningConnectionStringHandler(IServiceProvider serviceProvider, ILoggerFactory loggerFactory, EventAggregator eventAggregator)
 	{
 		_serviceProvider = serviceProvider;
 		_loggerFactory = loggerFactory;
+		_eventAggregator = eventAggregator;
 	}
 
 	public ILightningClient? Create(string connectionString, Network network, out string? error)
@@ -105,7 +107,7 @@ public class StrikeLightningConnectionStringHandler : ILightningConnectionString
 		var logger = _loggerFactory.CreateLogger<StrikeLightningClient>();
 		var dbContextFactory = _serviceProvider.GetRequiredService<StrikeDbContextFactory>();
 		
-		holder.AddOrUpdateClient(tenantId, new StrikeLightningClient(client, dbContextFactory, network, logger, convertToCurrency, tenantId));
+		holder.AddOrUpdateClient(tenantId, new StrikeLightningClient(client, dbContextFactory, network, logger, convertToCurrency, tenantId, _eventAggregator));
 		return holder.GetClient(tenantId);
 	}
 
