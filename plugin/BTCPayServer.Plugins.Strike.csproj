@@ -36,6 +36,7 @@
 		<ProjectReference Include="..\submodules\btcpayserver\BTCPayServer\BTCPayServer.csproj" />
 		<ProjectReference Include="..\submodules\strike-client\src\Strike.Client\Strike.Client.csproj">
 			<Private>true</Private>
+			<ExcludeAssets></ExcludeAssets>
 		</ProjectReference>
 	</ItemGroup>
 

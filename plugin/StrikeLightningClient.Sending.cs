@@ -61,7 +61,7 @@ public partial class StrikeLightningClient
 	public async Task<LightningPayment[]> ListPayments(ListPaymentsParams? request, CancellationToken cancellation = new())
 	{
 		await using var db = _dbContextFactory.CreateContext();
-		var payments = await GetPayments(db, _tenantId, request?.IncludePending == false, (int?)request?.OffsetIndex ?? 0);
+		var payments = await GetPayments(db, request?.IncludePending == false, (int?)request?.OffsetIndex ?? 0);
 		return payments
 			.Select(x => new LightningPayment
 			{
@@ -78,7 +78,7 @@ public partial class StrikeLightningClient
 	
 	
 
-	public async Task<StrikePayment[]> GetPayments(StrikeDbContext db, string tenantId, bool onlyCompleted, int offset = 0)
+	public async Task<StrikePayment[]> GetPayments(StrikeDbContext db, bool onlyCompleted, int offset = 0)
 	{
 		return await db.Payments
 			.Where(x => x.TenantId == _tenantId)
