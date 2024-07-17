@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
+using System.Threading.Tasks;
 using BTCPayServer.Lightning;
 using BTCPayServer.Plugins.Strike.Persistence;
 using Microsoft.Extensions.DependencyInjection;
@@ -102,6 +103,16 @@ public class StrikeLightningConnectionStringHandler : ILightningConnectionString
 
 		if (serverUrl != null)
 			client.ServerUrl = serverUrl;
+		
+		// Marfusios brought up a point that we need to verify API key, so adding it back here
+		// Doing it with Task.Run to avoid deadlocks, since we are forced in sync method
+		var balances = Task.Run(async () => await client.Balances.GetBalances()).GetAwaiter().GetResult();
+		if (!balances.IsSuccessStatusCode)
+		{
+			var errorFromServer = balances.Error?.Data;
+			error = $"The connection failed, check api key. Error: {errorFromServer?.Code} {errorFromServer?.Message}";
+			return null;
+		}
 
 		// initialize lightning client that listens on top of StrikeClient
 		var logger = _loggerFactory.CreateLogger<StrikeLightningClient>();
