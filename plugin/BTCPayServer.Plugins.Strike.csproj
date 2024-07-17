@@ -9,7 +9,7 @@
 	<PropertyGroup>
 		<Product>Strike</Product>
 		<Description>Strike as a lightning provider</Description>
-		<Version>1.1.1</Version>
+		<Version>1.2.0</Version>
 		<CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
 		<RootNamespace>BTCPayServer.Plugins.Strike</RootNamespace>
 	</PropertyGroup>
@@ -50,7 +50,7 @@
 			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 		</PackageReference>
 		<PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="8.0.0" />
-		<PackageReference Include="StrikeWallet.Client" Version="1.0.13" />
+		<PackageReference Include="StrikeWallet.Client" Version="1.1.2" />
 		<PackageReference Include="Westwind.AspNetCore.Markdown" Version="3.17.0" />
 	</ItemGroup>
 

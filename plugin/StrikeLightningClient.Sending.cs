@@ -18,7 +18,7 @@ public partial class StrikeLightningClient
 {
 	public async Task<LightningPayment?> GetPayment(string paymentHash, CancellationToken cancellation = new())
 	{
-		var storage = _db.ResolveStorage();
+		await using var storage = _db.ResolveStorage();
 		var found = await storage.FindPaymentByPaymentHash(paymentHash);
 		if (found == null)
 			return null;
@@ -58,7 +58,8 @@ public partial class StrikeLightningClient
 
 	public async Task<LightningPayment[]> ListPayments(ListPaymentsParams? request, CancellationToken cancellation = new())
 	{
-		var payments = await _db.ResolveStorage().GetPayments(request?.IncludePending == false, (int?)request?.OffsetIndex ?? 0);
+		await using var storage = _db.ResolveStorage();
+		var payments = await storage.GetPayments(request?.IncludePending == false, (int?)request?.OffsetIndex ?? 0);
 		return payments
 			.Select(x => new LightningPayment
 			{
@@ -88,8 +89,8 @@ public partial class StrikeLightningClient
 		var paymentQuote = await _client.PaymentQuotes.CreateLnQuote(new LnPaymentQuoteReq
 		{
 			LnInvoice = bolt11,
-			SourceCurrency = _targetOperatingCurrency,
-			Amount = !hasAmount ? new Money
+			SourceCurrency = TargetCurrency,
+			Amount = !hasAmount ? new MoneyWithFee
 			{
 				Currency = Currency.Btc,
 				Amount = requestedAmount?.ToUnit(LightMoneyUnit.BTC) ?? throw new InvalidOperationException("Cannot send payment, please specify amount for amount-less LN invoices")
@@ -122,7 +123,8 @@ public partial class StrikeLightningClient
 			ConversionRate = payment.ConversionRate?.Amount,
 			Status = realStatus
 		};
-		await _db.ResolveStorage().Store(entity);
+		await using var storage = _db.ResolveStorage();
+		await storage.Store(entity);
 
 		return new PayResponse
 		{

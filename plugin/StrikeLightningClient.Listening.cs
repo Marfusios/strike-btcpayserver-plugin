@@ -66,7 +66,7 @@ public partial class StrikeLightningClient
 
 			foreach (var invoice in _completedToBeReported.ToArray())
 			{
-				var storage = _client._db.ResolveStorage();
+				await using var storage = _client._db.ResolveStorage();
 				var quote = await storage.FindQuoteByInvoiceId(invoice.Id);
 				if (quote == null)
 				{
@@ -93,7 +93,7 @@ public partial class StrikeLightningClient
 
 		private async Task<LightningInvoice[]> GetCompleted(CancellationToken cancellation)
 		{
-			var storage = _client._db.ResolveStorage();
+			await using var storage = _client._db.ResolveStorage();
 			var unobserved = await storage.GetUnobserved(cancellation);
 			if (unobserved.Length == 0)
 				return Array.Empty<LightningInvoice>();
@@ -129,9 +129,8 @@ public partial class StrikeLightningClient
 			foreach (var bulk in bulks)
 			{
 				var ids = bulk.Select(x => Guid.Parse(x.InvoiceId)).ToArray();
-				var collection = await _client._client.Invoices.GetInvoices(builder => builder
-					.Filter((e, f, o) => o.In(e.InvoiceId, ids))
-					.OrderByDescending(x => x.Created));
+				var filter = $"{nameof(Invoice.InvoiceId)} in ({string.Join(',', ids)})";
+				var collection = await _client._client.Invoices.GetInvoices(filter);
 				invoices.AddRange(collection.Items);
 			}
 

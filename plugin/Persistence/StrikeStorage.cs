@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
 namespace BTCPayServer.Plugins.Strike.Persistence;
-public class StrikeStorage
+public class StrikeStorage : IDisposable, IAsyncDisposable
 {
 	private readonly ILogger _logger;
 	private readonly StrikeDbContext _db;
@@ -79,6 +79,16 @@ public class StrikeStorage
 			_logger.LogError(e, "Failed to store entity into the DB, error: {error} / {inner}", e.Message, e.InnerException?.Message);
 			throw;
 		}
+	}
+
+	public void Dispose()
+	{
+		_db.Dispose();
+	}
+
+	public async ValueTask DisposeAsync()
+	{
+		await _db.DisposeAsync();
 	}
 
 	private void ValidateTenantId()

@@ -18,7 +18,6 @@ public class StrikeLightningConnectionStringHandler : ILightningConnectionString
 	private readonly IServiceProvider _serviceProvider;
 	private readonly ILoggerFactory _loggerFactory;
 
-	private readonly ConcurrentDictionary<string, Currency> _fiatCurrencyForConnection = new();
 
 	public StrikeLightningConnectionStringHandler(IServiceProvider serviceProvider, ILoggerFactory loggerFactory)
 	{
@@ -83,6 +82,13 @@ public class StrikeLightningConnectionStringHandler : ILightningConnectionString
 		// TODO: use StoreId instead (but how to get it?)
 		var tenantId = ComputeHash(apiKey);
 
+		var clientLookup = _serviceProvider.GetRequiredService<StrikeLightningClientLookup>();
+		var existingClient = clientLookup.GetClient(tenantId);
+		if (existingClient != null && !HasCurrencyChanged(existingClient, currencyStr))
+		{
+			return existingClient;
+		}
+
 		var db = _serviceProvider.GetRequiredService<StrikeStorageFactory>();
 		db.TenantId = tenantId;
 
@@ -96,8 +102,7 @@ public class StrikeLightningConnectionStringHandler : ILightningConnectionString
 
 		var logger = _loggerFactory.CreateLogger<StrikeLightningClient>();
 
-		var connectionHash = ComputeHash(connectionString);
-		var accountFiatCurrency = GetAccountFiatCurrency(connectionHash, client, ref error);
+		var accountFiatCurrency = GetAccountFiatCurrency(client, ref error);
 		if (accountFiatCurrency == null)
 			return null;
 
@@ -112,14 +117,22 @@ public class StrikeLightningConnectionStringHandler : ILightningConnectionString
 			return null;
 		}
 
-		return new StrikeLightningClient(client, db, accountFiatCurrency.Value, targetOperatingCurrency, network, logger);
+		var lightningClient = new StrikeLightningClient(client, db, targetOperatingCurrency, network, logger);
+		clientLookup.AddOrUpdateClient(tenantId, lightningClient);
+		return lightningClient;
 	}
 
-	private Currency? GetAccountFiatCurrency(string connectionKey, StrikeClient client, ref string? error)
+	private static bool HasCurrencyChanged(StrikeLightningClient existingClient, string? targetCurrency)
 	{
-		if (_fiatCurrencyForConnection.TryGetValue(connectionKey, out var cachedCurrency))
-			return cachedCurrency;
+		var existing = existingClient.TargetCurrency.ToString().ToLower();
+		var target = targetCurrency?.ToLower() ?? string.Empty;
+		if (target == "fiat" && existing != "btc")
+			return false;
+		return existing != target;
+	}
 
+	private static Currency? GetAccountFiatCurrency(StrikeClient client, ref string? error)
+	{
 		try
 		{
 			var balances = client.Balances.GetBalances().GetAwaiter().GetResult();
@@ -131,7 +144,6 @@ public class StrikeLightningConnectionStringHandler : ILightningConnectionString
 			}
 
 			var accountFiatCurrency = balances.FirstOrDefault(x => x.Currency != Currency.Btc)?.Currency ?? Currency.Usd;
-			_fiatCurrencyForConnection[connectionKey] = accountFiatCurrency;
 			return accountFiatCurrency;
 		}
 		catch (Exception e)

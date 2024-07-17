@@ -42,6 +42,16 @@ public class StrikeQuote : IHasTenantId
 	public string TargetCurrency { get; init; } = string.Empty;
 
 	/// <summary>
+	/// The target currency to convert this quote after the payment is paid
+	/// </summary>
+	public string? ConvertToCurrency { get; init; }
+
+	/// <summary>
+	/// Whether the quote has been converted to the 'ConvertToCurrency' (only if not null)
+	/// </summary>
+	public bool Converted { get; set; }
+
+	/// <summary>
 	/// Conversion rate in case the target amount is in fiat
 	/// </summary>
 	public decimal ConversionRate { get; init; }
@@ -71,6 +81,7 @@ public class StrikeQuoteConfiguration : IEntityTypeConfiguration<StrikeQuote>
 		builder.Property(x => x.RealBtcAmount);
 		builder.Property(x => x.TargetAmount);
 		builder.Property(x => x.TargetCurrency).HasMaxLength(10);
+		builder.Property(x => x.ConvertToCurrency).HasMaxLength(10);
 		builder.Property(x => x.ConversionRate);
 
 		builder.Property(x => x.CreatedAt);

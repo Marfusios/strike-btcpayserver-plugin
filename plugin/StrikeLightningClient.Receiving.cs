@@ -29,7 +29,8 @@ public partial class StrikeLightningClient
 
 	public async Task<LightningInvoice?> GetInvoice(uint256 paymentHash, CancellationToken cancellation = new())
 	{
-		var found = await _db.ResolveStorage().FindQuoteByPaymentHash(paymentHash.ToString());
+		await using var storage = _db.ResolveStorage();
+		var found = await storage.FindQuoteByPaymentHash(paymentHash.ToString());
 		if (found == null)
 		{
 			return null;
@@ -81,7 +82,8 @@ public partial class StrikeLightningClient
 
 	private async Task<LightningInvoice> CreateInvoice(LightMoney amount, string? description, string? descriptionHash)
 	{
-		var invoiceAmount = await CalculateInvoiceAmount(amount);
+		var btcAmount = amount.ToUnit(LightMoneyUnit.BTC);
+		var invoiceAmount = new Money { Amount = btcAmount, Currency = Currency.Btc };
 		var invoice = await _client.Invoices.IssueInvoice(new InvoiceReq
 		{
 			Amount = invoiceAmount,
@@ -110,9 +112,11 @@ public partial class StrikeLightningClient
 			RealBtcAmount = parsedInvoice.MinimumAmount.ToUnit(LightMoneyUnit.BTC),
 			TargetAmount = invoice.Amount.Amount,
 			TargetCurrency = invoice.Amount.Currency.ToStringUpperInvariant(),
-			ConversionRate = quote.ConversionRate.Amount
+			ConversionRate = quote.ConversionRate.Amount,
+			ConvertToCurrency = TargetCurrency != Currency.Btc ? TargetCurrency.ToStringUpperInvariant() : null
 		};
-		await _db.ResolveStorage().Store(entity);
+		await using var storage = _db.ResolveStorage();
+		await storage.Store(entity);
 
 		return new LightningInvoice
 		{
@@ -125,7 +129,7 @@ public partial class StrikeLightningClient
 		};
 	}
 
-	private string? ParseDescription(string? description)
+	private static string? ParseDescription(string? description)
 	{
 		if (description == null)
 			return null;
@@ -161,27 +165,11 @@ public partial class StrikeLightningClient
 	private static string? FindValue(string[][] dict, string searchWord) =>
 		dict.FirstOrDefault(x => x.Length > 1 && x[0].Contains(searchWord, StringComparison.OrdinalIgnoreCase))?[1];
 
-	private async Task<Money> CalculateInvoiceAmount(LightMoney amount)
-	{
-		var btcAmount = amount.ToUnit(LightMoneyUnit.BTC);
-		if (_targetOperatingCurrency == Currency.Btc)
-			return new Money { Amount = btcAmount, Currency = Currency.Btc };
-
-		var rates = await _client.Rates.GetRatesTicker();
-		var foundRate = rates.FirstOrDefault(x =>
-			x.TargetCurrency == _targetOperatingCurrency
-			&& x.SourceCurrency == Currency.Btc);
-		if (foundRate is not { Amount: > 0 })
-			throw new InvalidOperationException(
-				$"Cannot calculate invoice amount, rate for BTC/{_targetOperatingCurrency.ToStringUpperInvariant()} is unavailable");
-		return new Money { Amount = btcAmount * foundRate.Amount, Currency = _targetOperatingCurrency };
-	}
-
 	private async Task<LightningInvoice?> ConvertInvoice(Invoice invoice)
 	{
 		try
 		{
-			var storage = _db.ResolveStorage();
+			await using var storage = _db.ResolveStorage();
 			var invoiceId = invoice.InvoiceId.ToString();
 			var quote = await storage.FindQuoteByInvoiceId(invoiceId);
 			if (quote == null)

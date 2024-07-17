@@ -8,6 +8,7 @@ using ExchangeSharp;
 using Microsoft.Extensions.Logging;
 using NBitcoin;
 using Strike.Client;
+using Strike.Client.CurrencyExchanges;
 using Strike.Client.Errors;
 using Strike.Client.Models;
 
@@ -17,25 +18,24 @@ public partial class StrikeLightningClient : ILightningClient
 {
 	private readonly ILogger _logger;
 	private readonly StrikeClient _client;
-	private readonly Currency _accountFiatCurrency;
-	private readonly Currency _targetOperatingCurrency;
 	private readonly Network _network;
 	private readonly StrikeStorageFactory _db;
 
-	public StrikeLightningClient(StrikeClient client, StrikeStorageFactory db, Currency accountFiatCurrency, Currency targetOperatingCurrency,
+	public StrikeLightningClient(StrikeClient client, StrikeStorageFactory db, Currency targetOperatingCurrency,
 		Network network, ILogger logger)
 	{
 		_logger = logger;
 		_db = db;
 		_network = network;
-		_targetOperatingCurrency = targetOperatingCurrency;
-		_accountFiatCurrency = accountFiatCurrency;
+		TargetCurrency = targetOperatingCurrency;
 		_client = client;
 	}
 
+	public Currency TargetCurrency { get; }
+
 	public override string ToString()
 	{
-		var currency = _targetOperatingCurrency.ToStringUpperInvariant();
+		var currency = TargetCurrency.ToStringUpperInvariant();
 		return _client.Environment == StrikeEnvironment.Custom ?
 			$"type=strike;currency={currency};server={_client.ServerUrl};api-key={_client.ApiKey}" :
 			$"type=strike;currency={currency};api-key={_client.ApiKey}";
@@ -94,6 +94,28 @@ public partial class StrikeLightningClient : ILightningClient
 	public Task<LightningChannel[]> ListChannels(CancellationToken cancellation = new())
 	{
 		throw new NotImplementedException();
+	}
+
+	public async Task<bool> ConvertAmount(Currency from, Currency to, decimal amountFrom, Guid idempotencyKey)
+	{
+		var req = new CurrencyExchangeQuoteReq
+		{
+			Sell = from,
+			Buy = to,
+			Amount = new MoneyWithFee
+			{
+				Currency = from,
+				Amount = amountFrom,
+				FeePolicy = FeePolicy.Exclusive
+			},
+			IdempotencyKey = idempotencyKey
+		};
+		var quote = await _client.CurrencyExchanges.CreateQuote(req);
+		if (quote.Error?.Data.Code == "DUPLICATE_CURRENCY_EXCHANGE_QUOTE")
+			return true;
+		ThrowOnError(quote);
+		var response = await _client.CurrencyExchanges.ExecuteQuote(quote.Id);
+		return response.IsSuccessStatusCode;
 	}
 
 	private void ThrowOnError(ResponseBase response)
