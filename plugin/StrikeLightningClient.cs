@@ -41,8 +41,8 @@ public partial class StrikeLightningClient : ILightningClient
 	{
 		var convertToCurrency = _convertToCurrency.ToStringUpperInvariant();
 		return _client.Environment == StrikeEnvironment.Custom ?
-			$"type=strike;convertTo={convertToCurrency};server={_client.ServerUrl};api-key={_client.ApiKey}" :
-			$"type=strike;convertTo={convertToCurrency};api-key={_client.ApiKey}";
+			$"type=strike;convert-to={convertToCurrency};server={_client.ServerUrl};api-key={_client.ApiKey}" :
+			$"type=strike;convert-to={convertToCurrency};api-key={_client.ApiKey}";
 	}
 
 	public Task<LightningNodeInformation> GetInfo(CancellationToken cancellation = new())

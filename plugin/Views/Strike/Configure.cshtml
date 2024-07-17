@@ -30,11 +30,11 @@
 	<ul>
 		<li>
 			<p>Then go to <code>BTCPayServer &gt; Lightning &gt; Settings &gt; "Change connection" &gt; "Use custom node"</code> and configure Strike connection. Follow this format:</p>
-<pre><code>type=strike;currency=FIAT;api-key=xxx
+<pre><code>type=strike;convert-to=USD;api-key=xxx
 </code></pre>
 			<p>
-				Where xxx is your API key.
-				Select <strong>FIAT</strong> if you want to automatically convert received bitcoins into fiat currency. Otherwise choose <strong>BTC</strong>.
+				Where <b>xxx</b> is your API key.
+				Optionally set <b>convert-to</b> to fiat currency that you want received payments to be converted to (e.g. USD, EUR, etc.)
 			</p>
 		</li>
 	</ul>

@@ -73,11 +73,11 @@ public class StrikeLightningConnectionStringHandler : ILightningConnectionString
 		}
 
 		var convertToCurrency = Currency.Undefined;
-		if (kv.TryGetValue("convertto", out var convertToCurrencyStr))
+		if (kv.TryGetValue("convert-to", out var convertToCurrencyStr))
 		{
 			if (!Enum.TryParse(convertToCurrencyStr, true, out convertToCurrency))
 			{
-				error = "The key 'convertTo' is invalid, set either 'BTC', 'USD', 'EUR'";
+				error = "The key 'convert-to' is invalid, set either 'BTC', 'USD', 'EUR'";
 				return null;
 			}
 		}
