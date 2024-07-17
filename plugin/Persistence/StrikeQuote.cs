@@ -6,8 +6,6 @@ using Strike.Client.Models;
 namespace BTCPayServer.Plugins.Strike.Persistence;
 public class StrikeQuote : IHasTenantId
 {
-	public long Id { get; init; }
-
 	public string TenantId { get; set; } = string.Empty;
 
 	public string InvoiceId { get; init; } = string.Empty;
@@ -61,8 +59,7 @@ public class StrikeQuoteConfiguration : IEntityTypeConfiguration<StrikeQuote>
 	public void Configure(EntityTypeBuilder<StrikeQuote> builder)
 	{
 		builder.ToTable("Quotes");
-		builder.Property(x => x.Id).ValueGeneratedOnAdd();
-		builder.HasKey(x => x.Id);
+		builder.HasKey(x => x.InvoiceId);
 
 		builder.Property(x => x.TenantId).HasMaxLength(300);
 		builder.Property(x => x.InvoiceId).HasMaxLength(300);

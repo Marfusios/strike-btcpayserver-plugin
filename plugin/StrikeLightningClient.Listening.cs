@@ -36,14 +36,24 @@ public partial class StrikeLightningClient
 	private class Listener : ILightningInvoiceListener
 	{
 		private readonly StrikeLightningClient _client;
+		private readonly IEventAggregatorSubscription _subscription;
+		private readonly Channel<StrikePaidInvoice> _channel = Channel.CreateUnbounded<StrikePaidInvoice>();
 
 		public Listener(StrikeLightningClient client)
 		{
 			_client = client;
+			_subscription = _client._eventAggregator.Subscribe<StrikePaidInvoice>(o =>
+			{
+				if (o.TenantId != client._tenantId)
+					return;
+				_channel.Writer.TryWrite(o);
+			});
 		}
 
 		public void Dispose()
 		{
+			_subscription.Dispose();
+			_channel.Writer.TryComplete();
 		}
 
 		public async Task<LightningInvoice> WaitInvoice(CancellationToken cancellation)
@@ -72,9 +82,9 @@ public partial class StrikeLightningClient
 
 					return lightningInvoice;
 				}
-				
+
 				// if invoice is not returned, wait for a second before checking again
-				await Task.Delay(1000, cancellation);
+				await _channel.Reader.ReadAsync(cancellation);
 			}
 		}
 	}

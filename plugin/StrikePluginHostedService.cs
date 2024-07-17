@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -16,6 +16,8 @@ using Strike.Client.Invoices;
 using Strike.Client.Models;
 
 namespace BTCPayServer.Plugins.Strike;
+
+public record StrikePaidInvoice(string TenantId, Invoice Invoice);
 
 public class StrikePluginHostedService : EventHostedServiceBase, IDisposable
 {
@@ -106,7 +108,7 @@ public class StrikePluginHostedService : EventHostedServiceBase, IDisposable
 		await using var db = _dbContextFactory.CreateContext();
 		foreach (var invoice in invoices.Where(a => a.State == InvoiceState.Paid))
 		{
-			var quote = await db.Quotes.SingleOrDefaultAsync(a => a.InvoiceId == invoice.InvoiceId.ToString());
+			var quote = await db.Quotes.FindAsync(invoice.InvoiceId.ToString());
 			if (quote == null)
 				continue;
 
@@ -114,7 +116,7 @@ public class StrikePluginHostedService : EventHostedServiceBase, IDisposable
 
 			// saving changes so that invoice listener can immediately pick up on this
 			await db.SaveChangesAsync();
-
+			EventAggregator.Publish(new StrikePaidInvoice(quote.TenantId, invoice));
 			// PROCESS CURRENCY CONVERSION
 			if (quote.PaidConvertTo != null)
 			{
@@ -143,7 +145,7 @@ public class StrikePluginHostedService : EventHostedServiceBase, IDisposable
 		foreach (var invoice in invoices.Where(a => 
 			         a.State is InvoiceState.Canceled or InvoiceState.Reversed or InvoiceState.Undefined))
 		{
-				var quote = await db.Quotes.SingleOrDefaultAsync(a => a.InvoiceId == invoice.InvoiceId.ToString());
+				var quote = await db.Quotes.FindAsync(invoice.InvoiceId.ToString());
 				if (quote == null)
 					continue;
 
@@ -180,7 +182,7 @@ public class StrikePluginHostedService : EventHostedServiceBase, IDisposable
 			if (pm?.GetPaymentMethodDetails() is LightningLikePaymentMethodDetails lightning)
 			{
 				await using var db = _dbContextFactory.CreateContext();
-				var quote = await db.Quotes.SingleOrDefaultAsync(a => a.InvoiceId == lightning.InvoiceId, cancellationToken: cancellationToken);
+				var quote = await db.Quotes.FindAsync(new[] { lightning.InvoiceId }, cancellationToken: cancellationToken);
 				if (quote != null)
 				{
 					quote.Observed = true;

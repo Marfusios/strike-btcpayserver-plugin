@@ -23,9 +23,10 @@ public partial class StrikeLightningClient : ILightningClient
 	private readonly ILogger _logger;
 	private readonly Currency _convertToCurrency;
 	private readonly string _tenantId;
+	private readonly EventAggregator _eventAggregator;
 
 	public StrikeLightningClient(StrikeClient client, StrikeDbContextFactory dbContextFactory, 
-		Network network, ILogger logger, Currency convertToCurrency, string tenantId)
+		Network network, ILogger logger, Currency convertToCurrency, string tenantId, EventAggregator eventAggregator)
 	{
 		_client = client;
 		_dbContextFactory = dbContextFactory;
@@ -33,6 +34,7 @@ public partial class StrikeLightningClient : ILightningClient
 		_logger = logger;
 		_convertToCurrency = convertToCurrency;
 		_tenantId = tenantId;
+		_eventAggregator = eventAggregator;
 	}
 
 	public override string ToString()

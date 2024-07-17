@@ -178,9 +178,8 @@ public partial class StrikeLightningClient
 			await using var db = _dbContextFactory.CreateContext();
 			
 			var invoiceId = invoice.InvoiceId.ToString();
-			var quote = await db.Quotes
-				.FirstOrDefaultAsync(x => x.TenantId == _tenantId && x.InvoiceId == invoiceId);
-			if (quote == null)
+			var quote = await db.Quotes.FindAsync(invoiceId);
+			if (quote == null || quote.TenantId != _tenantId)
 				return null;
 
 			var converted = ConvertInvoice(invoice, quote);
