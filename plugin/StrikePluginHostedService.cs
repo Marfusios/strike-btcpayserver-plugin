@@ -53,9 +53,11 @@ public class StrikePluginHostedService : EventHostedServiceBase, IDisposable
 				InvoiceEvent.PaymentSettled
 			} invoiceEvent)
 		{
-			var paymentMethod = new PaymentMethodId("BTC", PaymentTypes.LightningLike);
-			var pm = invoiceEvent.Invoice.GetPaymentMethod(paymentMethod);
-			if (pm?.GetPaymentMethodDetails() is LightningLikePaymentMethodDetails lightning)
+			var lightningMethod = new PaymentMethodId("BTC", PaymentTypes.LightningLike);
+			var lnurlMethod = new PaymentMethodId("BTC", PaymentTypes.LNURLPay);
+			var details = invoiceEvent.Invoice.GetPaymentMethod(lightningMethod)?.GetPaymentMethodDetails() ??
+			         invoiceEvent.Invoice.GetPaymentMethod(lnurlMethod)?.GetPaymentMethodDetails();
+			if (details is LightningLikePaymentMethodDetails lightning)
 			{
 				await using var storage = _storageFactory.ResolveStorage();
 				var quote = await storage.FindQuoteByInvoiceId(lightning.InvoiceId);
