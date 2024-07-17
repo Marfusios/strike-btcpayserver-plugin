@@ -104,7 +104,7 @@ public partial class StrikeLightningClient
 		{
 			LnInvoice = bolt11,
 			SourceCurrency = Currency.Btc,
-			Amount = !hasAmount ? new Money
+			Amount = !hasAmount ? new MoneyWithFee
 			{
 				Currency = Currency.Btc,
 				Amount = requestedAmount?.ToUnit(LightMoneyUnit.BTC) ?? throw new InvalidOperationException("Cannot send payment, please specify amount for amount-less LN invoices")

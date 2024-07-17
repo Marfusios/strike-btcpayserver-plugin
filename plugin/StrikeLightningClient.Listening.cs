@@ -27,8 +27,8 @@ public partial class StrikeLightningClient
 
 	public async Task<bool> ExecCurrencyConversion(CurrencyExchangeQuoteReq req, CancellationToken cancellation = new())
 	{
-		var resp = await _client.CurrencyExchanges.PostCurrencyExchangeQuote(req);
-		var exec = await _client.CurrencyExchanges.PatchExecuteQuote(resp.Id);
+		var resp = await _client.CurrencyExchanges.CreateQuote(req);
+		var exec = await _client.CurrencyExchanges.ExecuteQuote(resp.Id);
 
 		return exec.IsSuccessStatusCode;
 	}

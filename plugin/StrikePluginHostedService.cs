@@ -126,7 +126,7 @@ public class StrikePluginHostedService : EventHostedServiceBase, IDisposable
 				{
 					Sell = target,
 					Buy = convertTo,
-					Amount = new CurrencyExchangeAmount
+					Amount = new MoneyWithFee
 					{
 						Currency = target, Amount = quote.TargetAmount, FeePolicy = FeePolicy.Exclusive
 					}
