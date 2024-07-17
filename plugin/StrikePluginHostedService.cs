@@ -43,7 +43,15 @@ public class StrikePluginHostedService : EventHostedServiceBase, IDisposable
 	protected override async Task ProcessEvent(object evt, CancellationToken cancellationToken)
 	{
 		// convert paid invoice to the requested currency
-		if (evt is InvoiceEvent { Name: InvoiceEvent.Completed or InvoiceEvent.MarkedCompleted or InvoiceEvent.Confirmed } invoiceEvent)
+		if (evt is InvoiceEvent
+			{
+				Name:
+				InvoiceEvent.Completed or
+				InvoiceEvent.MarkedCompleted or
+				InvoiceEvent.Confirmed or
+				InvoiceEvent.ReceivedPayment or
+				InvoiceEvent.PaymentSettled
+			} invoiceEvent)
 		{
 			var paymentMethod = new PaymentMethodId("BTC", PaymentTypes.LightningLike);
 			var pm = invoiceEvent.Invoice.GetPaymentMethod(paymentMethod);
