@@ -14,9 +14,11 @@ namespace BTCPayServer.Plugins.Strike.Migrations
         protected override void Up(MigrationBuilder migrationBuilder)
         {
 			migrationBuilder.Sql("""
+ALTER TABLE "BTCPayServer.Plugins.Strike"."Quotes" DROP CONSTRAINT "PK_Quotes";
+ALTER TABLE "BTCPayServer.Plugins.Strike"."Quotes" DROP COLUMN "Id";
+ALTER TABLE "BTCPayServer.Plugins.Strike"."Quotes" ADD CONSTRAINT "PK_Quotes" PRIMARY KEY("InvoiceId");
 CREATE INDEX idx_quotes_not_observed ON "BTCPayServer.Plugins.Strike"."Quotes"("TenantId") WHERE NOT("Observed");
 CREATE INDEX idx_quotes_paymenthash ON "BTCPayServer.Plugins.Strike"."Quotes"("PaymentHash");
-CREATE INDEX idx_quotes_invoiceid ON "BTCPayServer.Plugins.Strike"."Quotes"("InvoiceId");
 CREATE INDEX idx_payments_tenantid_paymenthash ON "BTCPayServer.Plugins.Strike"."Payments"("TenantId","PaymentHash");
 """);
         }

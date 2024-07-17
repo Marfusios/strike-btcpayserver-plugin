@@ -108,7 +108,7 @@ public class StrikePluginHostedService : EventHostedServiceBase, IDisposable
 		await using var db = _dbContextFactory.CreateContext();
 		foreach (var invoice in invoices.Where(a => a.State == InvoiceState.Paid))
 		{
-			var quote = await db.Quotes.SingleOrDefaultAsync(a => a.InvoiceId == invoice.InvoiceId.ToString());
+			var quote = await db.Quotes.FindAsync(invoice.InvoiceId.ToString());
 			if (quote == null)
 				continue;
 
@@ -145,7 +145,7 @@ public class StrikePluginHostedService : EventHostedServiceBase, IDisposable
 		foreach (var invoice in invoices.Where(a => 
 			         a.State is InvoiceState.Canceled or InvoiceState.Reversed or InvoiceState.Undefined))
 		{
-				var quote = await db.Quotes.SingleOrDefaultAsync(a => a.InvoiceId == invoice.InvoiceId.ToString());
+				var quote = await db.Quotes.FindAsync(invoice.InvoiceId.ToString());
 				if (quote == null)
 					continue;
 
@@ -182,7 +182,7 @@ public class StrikePluginHostedService : EventHostedServiceBase, IDisposable
 			if (pm?.GetPaymentMethodDetails() is LightningLikePaymentMethodDetails lightning)
 			{
 				await using var db = _dbContextFactory.CreateContext();
-				var quote = await db.Quotes.SingleOrDefaultAsync(a => a.InvoiceId == lightning.InvoiceId, cancellationToken: cancellationToken);
+				var quote = await db.Quotes.FindAsync(new[] { lightning.InvoiceId }, cancellationToken: cancellationToken);
 				if (quote != null)
 				{
 					quote.Observed = true;
