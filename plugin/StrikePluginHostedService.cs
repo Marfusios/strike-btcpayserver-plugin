@@ -55,6 +55,10 @@ public class StrikePluginHostedService : EventHostedServiceBase, IDisposable
 				{
 					await ConvertQuote(quote, storage);
 				}
+				else
+				{
+					_logger.LogWarning("No quote for invoice {invoiceId} was found, cannot proceed with conversion", lightning.InvoiceId);
+				}
 			}
 		}
 
@@ -63,24 +67,32 @@ public class StrikePluginHostedService : EventHostedServiceBase, IDisposable
 
 	private async Task ConvertQuote(StrikeQuote quote, StrikeStorage storage)
 	{
-		if (!quote.Paid || quote.ConvertToCurrency == null || quote.Converted)
-			return;
-
-		var client = _clientLookup.GetClient(quote.TenantId);
-		if (client == null)
+		try
 		{
-			_logger.LogWarning("Client not found for tenant {tenantId}. Cannot convert quote for invoice {invoiceId} to {currency}",
-				quote.TenantId, quote.InvoiceId, quote.ConvertToCurrency);
-			return;
+			if (!quote.Paid || quote.ConvertToCurrency == null || quote.Converted)
+				return;
+
+			var client = _clientLookup.GetClient(quote.TenantId);
+			if (client == null)
+			{
+				_logger.LogWarning("Client not found for tenant {tenantId}. Cannot convert quote for invoice {invoiceId} to {currency}",
+					quote.TenantId, quote.InvoiceId, quote.ConvertToCurrency);
+				return;
+			}
+
+			var to = Enum.Parse<Currency>(quote.ConvertToCurrency, true);
+			var from = Enum.Parse<Currency>(quote.TargetCurrency, true);
+			var amount = quote.TargetAmount;
+			var idempotency = Guid.Parse(quote.InvoiceId);
+
+			var converted = await client.ConvertAmount(from, to, amount, idempotency);
+			quote.Converted = converted;
+			await storage.Store(quote);
 		}
-
-		var to = Enum.Parse<Currency>(quote.ConvertToCurrency, true);
-		var from = Enum.Parse<Currency>(quote.TargetCurrency, true);
-		var amount = quote.TargetAmount;
-		var idempotency = Guid.Parse(quote.InvoiceId);
-
-		var converted = await client.ConvertAmount(from, to, amount, idempotency);
-		quote.Converted = converted;
-		await storage.Store(quote);
+		catch (Exception e)
+		{
+			_logger.LogWarning(e, "Failed to convert quote for invoice {invoiceId} to the target currency {currency}. Error: {error}",
+				quote.InvoiceId, quote.ConvertToCurrency, e.Message);
+		}
 	}
 }
