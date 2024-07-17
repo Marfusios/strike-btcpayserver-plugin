@@ -90,9 +90,11 @@ namespace BTCPayServer.Plugins.Strike.Migrations
 
             modelBuilder.Entity("BTCPayServer.Plugins.Strike.Persistence.StrikeQuote", b =>
                 {
-                    b.Property<string>("InvoiceId")
-                        .HasMaxLength(300)
-                        .HasColumnType("character varying(300)");
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
                     b.Property<decimal>("ConversionRate")
                         .HasColumnType("numeric");
@@ -106,6 +108,11 @@ namespace BTCPayServer.Plugins.Strike.Migrations
 
                     b.Property<DateTimeOffset>("ExpiresAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("InvoiceId")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
 
                     b.Property<string>("LightningInvoice")
                         .IsRequired()
@@ -145,7 +152,7 @@ namespace BTCPayServer.Plugins.Strike.Migrations
                         .HasMaxLength(300)
                         .HasColumnType("character varying(300)");
 
-                    b.HasKey("InvoiceId");
+                    b.HasKey("Id");
 
                     b.ToTable("Quotes", "BTCPayServer.Plugins.Strike");
                 });
