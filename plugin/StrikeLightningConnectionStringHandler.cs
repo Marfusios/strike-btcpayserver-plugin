@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Concurrent;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
@@ -79,18 +78,14 @@ public class StrikeLightningConnectionStringHandler : ILightningConnectionString
 
 		error = null;
 
-		// TODO: use StoreId instead (but how to get it?)
-		var tenantId = ComputeHash(apiKey);
+		var tenantId = ComputeTenantId(apiKey, currencyStr);
 
 		var clientLookup = _serviceProvider.GetRequiredService<StrikeLightningClientLookup>();
 		var existingClient = clientLookup.GetClient(tenantId);
-		if (existingClient != null && !HasCurrencyChanged(existingClient, currencyStr))
+		if (existingClient != null)
 		{
 			return existingClient;
 		}
-
-		var db = _serviceProvider.GetRequiredService<StrikeStorageFactory>();
-		db.TenantId = tenantId;
 
 		var client = _serviceProvider.GetRequiredService<StrikeClient>();
 		client.ApiKey = apiKey;
@@ -117,18 +112,20 @@ public class StrikeLightningConnectionStringHandler : ILightningConnectionString
 			return null;
 		}
 
+		// recompute tenantId with the real currency
+		tenantId = ComputeTenantId(apiKey, targetOperatingCurrency.ToString());
+
+		var db = _serviceProvider.GetRequiredService<StrikeStorageFactory>();
+		db.TenantId = tenantId;
+
 		var lightningClient = new StrikeLightningClient(client, db, targetOperatingCurrency, network, logger);
 		clientLookup.AddOrUpdateClient(tenantId, lightningClient);
 		return lightningClient;
 	}
 
-	private static bool HasCurrencyChanged(StrikeLightningClient existingClient, string? targetCurrency)
+	private string ComputeTenantId(string apiKey, string currency)
 	{
-		var existing = existingClient.TargetCurrency.ToString().ToLower();
-		var target = targetCurrency?.ToLower() ?? string.Empty;
-		if (target == "fiat" && existing != "btc")
-			return false;
-		return existing != target;
+		return ComputeHash($"{apiKey}__{currency.ToLowerInvariant()}");
 	}
 
 	private static Currency? GetAccountFiatCurrency(StrikeClient client, ref string? error)

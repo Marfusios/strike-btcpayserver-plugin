@@ -34,7 +34,7 @@ public class StrikePlugin : BaseBTCPayServerPlugin
 		});
 		applicationBuilder.AddHostedService<StrikeDbContextMigrator>();
 
-		applicationBuilder.AddSingleton<StrikeStorageFactory>();
+		applicationBuilder.AddTransient<StrikeStorageFactory>();
 		applicationBuilder.AddTransient<StrikeStorage>();
 
 		applicationBuilder.AddStrikeHttpClient();

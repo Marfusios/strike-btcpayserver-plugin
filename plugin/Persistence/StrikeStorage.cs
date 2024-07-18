@@ -17,7 +17,7 @@ public class StrikeStorage : IDisposable, IAsyncDisposable
 		_logger = logger;
 	}
 
-	public string TenantId { get; set; } = string.Empty;
+	public string? TenantId { get; set; }
 
 	public async Task<StrikeQuote[]> GetUnobserved(CancellationToken cancellation)
 	{
@@ -31,25 +31,25 @@ public class StrikeStorage : IDisposable, IAsyncDisposable
 	public async Task<StrikeQuote?> FindQuoteByInvoiceId(string invoiceId)
 	{
 		return await _db.Quotes
-			.FirstOrDefaultAsync(x => x.TenantId == TenantId && x.InvoiceId == invoiceId);
+			.FirstOrDefaultAsync(x => (TenantId == null || x.TenantId == TenantId) && x.InvoiceId == invoiceId);
 	}
 
 	public async Task<StrikeQuote?> FindQuoteByPaymentHash(string paymentHash)
 	{
 		return await _db.Quotes
-			.FirstOrDefaultAsync(x => x.TenantId == TenantId && x.PaymentHash == paymentHash);
+			.FirstOrDefaultAsync(x => (TenantId == null || x.TenantId == TenantId) && x.PaymentHash == paymentHash);
 	}
 
 	public async Task<StrikePayment?> FindPaymentByPaymentHash(string paymentHash)
 	{
 		return await _db.Payments
-			.FirstOrDefaultAsync(x => x.TenantId == TenantId && x.PaymentHash == paymentHash);
+			.FirstOrDefaultAsync(x => (TenantId == null || x.TenantId == TenantId) && x.PaymentHash == paymentHash);
 	}
 
 	public async Task<StrikePayment[]> GetPayments(bool onlyCompleted, int offset = 0)
 	{
 		return await _db.Payments
-			.Where(x => x.TenantId == TenantId)
+			.Where(x => TenantId == null || x.TenantId == TenantId)
 			.Where(x => onlyCompleted && x.CompletedAt != null)
 			.OrderByDescending(x => x.CreatedAt)
 			.Skip(offset)
@@ -60,11 +60,10 @@ public class StrikeStorage : IDisposable, IAsyncDisposable
 	{
 		try
 		{
-			ValidateTenantId();
-
 			if (_db.Entry(entity).State == EntityState.Detached)
 			{
-				entity.TenantId = TenantId;
+				ValidateTenantId();
+				entity.TenantId = TenantId ?? string.Empty;
 				_db.Add(entity);
 			}
 			else
@@ -99,6 +98,12 @@ public class StrikeStorage : IDisposable, IAsyncDisposable
 
 	private void ValidateTenantId(string targetTenantId)
 	{
+		if (TenantId == null)
+		{
+			// special case, we are not tenant-bound
+			return;
+		}
+
 		if (targetTenantId != TenantId)
 			throw new InvalidOperationException($"The updated entity doesn't belong to this tenant ({targetTenantId} vs. {TenantId}), cannot continue");
 	}

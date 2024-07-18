@@ -6,7 +6,7 @@ public class StrikeStorageFactory
 	private readonly StrikeDbContextFactory _dbFactory;
 	private readonly ILogger<StrikeStorageFactory> _logger;
 
-	public string TenantId { get; set; } = string.Empty;
+	public string? TenantId { get; set; }
 
 	public StrikeStorageFactory(StrikeDbContextFactory dbFactory, ILogger<StrikeStorageFactory> logger)
 	{
