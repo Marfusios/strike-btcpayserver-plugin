@@ -11,7 +11,7 @@
 		<Description>Rockstar Fork of Strike plugin as a lightning provider</Description>
 		<Version>1.1.8</Version>
 		<CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
-		<RootNamespace>BTCPayServerPlugins.RockstarDev.Strike</RootNamespace>
+		<RootNamespace>BTCPayServer.Plugins.Strike</RootNamespace>
 		<AssemblyName>BTCPayServerPlugins.RockstarDev.Strike</AssemblyName>
 	</PropertyGroup>
 	<!-- Plugin development properties -->
