@@ -7,11 +7,12 @@
 
 	<!-- Plugin specific properties -->
 	<PropertyGroup>
-		<Product>Strike</Product>
-		<Description>Strike as a lightning provider, Rockstar Fork</Description>
-		<Version>1.1.7</Version>
+		<Product>Strike, Rockstar'd</Product>
+		<Description>Rockstar Fork of Strike plugin as a lightning provider</Description>
+		<Version>1.1.8</Version>
 		<CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
-		<RootNamespace>BTCPayServer.Plugins.Strike</RootNamespace>
+		<RootNamespace>BTCPayServerPlugins.RockstarDev.Strike</RootNamespace>
+		<AssemblyName>BTCPayServerPlugins.RockstarDev.Strike</AssemblyName>
 	</PropertyGroup>
 	<!-- Plugin development properties -->
 	<PropertyGroup>

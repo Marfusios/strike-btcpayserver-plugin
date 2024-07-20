@@ -8,7 +8,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 #nullable disable
 
-namespace BTCPayServer.Plugins.Strike.Migrations
+namespace BTCPayServerPlugins.RockstarDev.Strike.Migrations
 {
     [DbContext(typeof(StrikeDbContext))]
     partial class StrikeDbContextModelSnapshot : ModelSnapshot
@@ -17,8 +17,8 @@ namespace BTCPayServer.Plugins.Strike.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasDefaultSchema("BTCPayServer.Plugins.Strike")
-                .HasAnnotation("ProductVersion", "8.0.6")
+                .HasDefaultSchema("BTCPayServerPlugins.RockstarDev.Strike")
+                .HasAnnotation("ProductVersion", "8.0.5")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -85,7 +85,7 @@ namespace BTCPayServer.Plugins.Strike.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Payments", "BTCPayServer.Plugins.Strike");
+                    b.ToTable("Payments", "BTCPayServerPlugins.RockstarDev.Strike");
                 });
 
             modelBuilder.Entity("BTCPayServer.Plugins.Strike.Persistence.StrikeQuote", b =>
@@ -147,7 +147,7 @@ namespace BTCPayServer.Plugins.Strike.Migrations
 
                     b.HasKey("InvoiceId");
 
-                    b.ToTable("Quotes", "BTCPayServer.Plugins.Strike");
+                    b.ToTable("Quotes", "BTCPayServerPlugins.RockstarDev.Strike");
                 });
 #pragma warning restore 612, 618
         }

@@ -1,7 +1,7 @@
 ﻿using System.Reflection;
 using System.Text.Json;
 
-var pluginName = "BTCPayServer.Plugins.Strike";
+var pluginName = "BTCPayServerPlugins.RockstarDev.Strike";
 var directories = Directory.GetDirectories("../../../../plugin");
 var targetPlugins = "";
 foreach (var directory in directories)
