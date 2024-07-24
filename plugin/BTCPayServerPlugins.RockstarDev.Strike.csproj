@@ -7,9 +7,9 @@
 
 	<!-- Plugin specific properties -->
 	<PropertyGroup>
-		<Product>Strike, Rockstar'd</Product>
+		<Product>Strike plugin for BTCPayServer</Product>
 		<Description>Rockstar Fork of Strike plugin as a lightning provider</Description>
-		<Version>1.2.1</Version>
+		<Version>1.2.2</Version>
 		<CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
 		<RootNamespace>BTCPayServer.Plugins.Strike</RootNamespace>
 		<AssemblyName>BTCPayServerPlugins.RockstarDev.Strike</AssemblyName>
