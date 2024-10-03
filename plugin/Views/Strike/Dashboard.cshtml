@@ -1,6 +1,32 @@
-﻿@using BTCPayServer.Models.StoreViewModels
+﻿@using BTCPayServer
+@using BTCPayServer.Models.StoreViewModels
+@using BTCPayServer.Plugins.Strike
 @using BTCPayServer.Security
+@using ExchangeSharp
+@using Strike.Client
+@using Strike.Client.Balances
+@using Strike.Client.Models
 @model object
+@inject StrikeClientFinder StrikeFinder
+
+@functions {
+	private static string? EstimatedValue(Balance balance, ResponseCollection<ConversionAmount> rates, Currency fiatCurrency)
+	{
+		if(!rates.IsSuccessStatusCode || rates.Count <= 0)
+			return "unavailable";
+
+        var targetCurrency = balance.Currency == fiatCurrency ? Currency.Btc : fiatCurrency;
+        var isTargetBtc = targetCurrency == Currency.Btc;
+        var found = rates.FirstOrDefault(r => r.SourceCurrency == balance.Currency && r.TargetCurrency == targetCurrency);
+        if (found == null)
+			return "unavailable";
+
+        var converted = balance.Total * found.Amount;
+        converted = isTargetBtc ? Math.Round(converted, 8) : Math.Round(converted, 2);
+        return $"{converted} {targetCurrency.ToStringUpperInvariant()}";
+	}
+}
+
 @{
 	ViewData.SetActivePage("Strike", "Strike Dashboard", "Dashboard");
     var storeId = Model switch
@@ -9,10 +35,66 @@
         StoreDashboardViewModel dashboardModel => dashboardModel.StoreId,
         _ => Context.GetImplicitStoreId()
     };
+
+    var client = StrikeFinder.TryGetClient(Context.GetStoreData(), out var error);
+    var balances = client != null ? await client.Balances.GetBalances() : new ResponseCollection<Balance>();
+    var rates = client != null ? await client.Rates.GetRatesTicker() : new ResponseCollection<ConversionAmount>();
 }
 
-<div class="alert alert-warning mb-4 text-break" role="alert" v-pre>
-	<span>
-        This page is under construction. Please check back later. 
-	</span>
-</div>
+@if (client == null)
+{
+	<div class="alert alert-warning mb-4 text-break" role="alert">
+		<div>
+			@if (string.IsNullOrWhiteSpace(error))
+			{
+				<span>Strike plugin is not configured</span>
+			} 
+			else 
+			{
+				<span>@error</span>
+			}
+		</div>
+		<span>
+			Configure <a href="/plugins/@storeId/strike/configure" style="text-decoration: underline">here</a>
+		</span>
+	</div>
+}
+else
+{
+	if (!balances.IsSuccessStatusCode)
+	{
+		<div class="alert alert-warning mb-4 text-break" role="alert">
+            <span>Failed to gather balances</span>
+			<span>@balances.Error?.Data.Code @balances.Error?.Data.Message</span>
+		</div>
+	}
+	else
+	{
+		<div class="row">
+            
+            @{
+	            var fiatCurrency = balances.FirstOrDefault(b => b.Currency != Currency.Btc)?.Currency ?? Currency.Usd;
+            }
+
+			@foreach (var balance in balances)
+            {
+	            var currency = balance.Currency.ToStringUpperInvariant();
+
+				<div class="col-md-4">
+		            <div class="card mb-4">
+                        <div class="card-header p-4 d-flex align-items-baseline gap-2">
+				            <h5 class="card-title mb-0">@currency</h5>
+				            <span class="text-secondary fw-semibold text-nowrap">
+					            balance
+				            </span>
+			            </div>
+			            <div class="card-body p-4">
+				            <h2 class="card-text">@balance.Total</h2>
+                            <small class="text-muted">≈ @EstimatedValue(balance, rates, fiatCurrency)</small>
+			            </div>
+		            </div>
+	            </div>
+            }
+		</div>
+	}
+}

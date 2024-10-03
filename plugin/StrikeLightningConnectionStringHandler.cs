@@ -1,7 +1,5 @@
 ﻿using System;
 using System.Linq;
-using System.Security.Cryptography;
-using System.Text;
 using BTCPayServer.Lightning;
 using BTCPayServer.Plugins.Strike.Persistence;
 using Microsoft.Extensions.DependencyInjection;
@@ -9,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using Strike.Client;
 using Strike.Client.Models;
 using Network = NBitcoin.Network;
+using Lookup = BTCPayServer.Plugins.Strike.StrikeLightningClientLookup;
 
 namespace BTCPayServer.Plugins.Strike;
 
@@ -78,7 +77,7 @@ public class StrikeLightningConnectionStringHandler : ILightningConnectionString
 
 		error = null;
 
-		var tenantId = ComputeTenantId(apiKey, currencyStr);
+		var tenantId = Lookup.ComputeTenantId(apiKey, currencyStr);
 
 		var clientLookup = _serviceProvider.GetRequiredService<StrikeLightningClientLookup>();
 		var existingClient = clientLookup.GetClient(tenantId);
@@ -113,7 +112,7 @@ public class StrikeLightningConnectionStringHandler : ILightningConnectionString
 		}
 
 		// recompute tenantId with the real currency
-		tenantId = ComputeTenantId(apiKey, targetOperatingCurrency.ToString());
+		tenantId = Lookup.ComputeTenantId(apiKey, targetOperatingCurrency.ToString());
 
 		var db = _serviceProvider.GetRequiredService<StrikeStorageFactory>();
 		db.TenantId = tenantId;
@@ -121,11 +120,6 @@ public class StrikeLightningConnectionStringHandler : ILightningConnectionString
 		var lightningClient = new StrikeLightningClient(client, db, targetOperatingCurrency, network, logger);
 		clientLookup.AddOrUpdateClient(tenantId, lightningClient);
 		return lightningClient;
-	}
-
-	private string ComputeTenantId(string apiKey, string currency)
-	{
-		return ComputeHash($"{apiKey}__{currency.ToLowerInvariant()}");
 	}
 
 	private static Currency? GetAccountFiatCurrency(StrikeClient client, ref string? error)
@@ -148,20 +142,5 @@ public class StrikeLightningConnectionStringHandler : ILightningConnectionString
 			error = $"Invalid server or api key. Error: {e.Message}";
 			return null;
 		}
-	}
-
-	private static string ComputeHash(string value)
-	{
-		var sb = new StringBuilder();
-		using (var hash = SHA256.Create())
-		{
-			var enc = Encoding.UTF8;
-			var result = hash.ComputeHash(enc.GetBytes(value));
-
-			foreach (var b in result)
-				sb.Append(b.ToString("x2"));
-		}
-
-		return sb.ToString();
 	}
 }

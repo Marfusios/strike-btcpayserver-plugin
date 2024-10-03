@@ -1,17 +1,14 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Linq;
-using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using BTCPayServer.Lightning;
 using BTCPayServer.Plugins.Strike.Persistence;
 using ExchangeSharp;
-using Microsoft.Extensions.Logging;
 using NBitcoin;
 using Newtonsoft.Json;
-using Strike.Client.Invoices;
 using Strike.Client.Models;
+using Strike.Client.ReceiveRequests.Requests;
 using Money = Strike.Client.Models.Money;
 
 namespace BTCPayServer.Plugins.Strike;
@@ -20,45 +17,36 @@ public partial class StrikeLightningClient
 {
 	public async Task<LightningInvoice?> GetInvoice(string invoiceId, CancellationToken cancellation = new())
 	{
-		var invoice = await _client.Invoices.FindInvoice(Guid.Parse(invoiceId));
-		if (invoice.StatusCode == HttpStatusCode.NotFound)
-			return null;
-		ThrowOnError(invoice);
-		return await ConvertInvoice(invoice);
+		await using var storage = _db.ResolveStorage();
+		var found = await storage.FindReceiveRequest(invoiceId);
+		return ConvertReceiveRequest(found);
 	}
 
 	public async Task<LightningInvoice?> GetInvoice(uint256 paymentHash, CancellationToken cancellation = new())
 	{
 		await using var storage = _db.ResolveStorage();
-		var found = await storage.FindQuoteByPaymentHash(paymentHash.ToString());
-		if (found == null)
-		{
-			return null;
-		}
-		return await GetInvoice(found.InvoiceId, cancellation);
+		var found = await storage.FindReceiveRequestByPaymentHash(paymentHash.ToString());
+		return ConvertReceiveRequest(found);
 	}
 
 	public async Task<LightningInvoice[]> ListInvoices(CancellationToken cancellation = new())
 	{
-		var invoices = await _client.Invoices.GetInvoices();
-		ThrowOnError(invoices);
-		return await ConvertInvoices(invoices);
+		await using var storage = _db.ResolveStorage();
+		var requests = await storage.GetReceiveRequests(false);
+		return ConvertReceiveRequests(requests);
 	}
 
 	public async Task<LightningInvoice[]> ListInvoices(ListInvoicesParams? request, CancellationToken cancellation = new())
 	{
-		var invoices = await _client.Invoices.GetInvoices(100, (int)(request?.OffsetIndex ?? 0));
-		ThrowOnError(invoices);
-
-		return (await ConvertInvoices(invoices))
-			.Where(x => request?.PendingOnly == true && x.Status == LightningInvoiceStatus.Unpaid)
-			.ToArray()!;
+		await using var storage = _db.ResolveStorage();
+		var requests = await storage.GetReceiveRequests(request?.PendingOnly == true);
+		return ConvertReceiveRequests(requests);
 	}
 
 	public async Task<LightningInvoice> CreateInvoice(LightMoney amount, string? description, TimeSpan expiry,
 		CancellationToken cancellation = new())
 	{
-		return await CreateInvoice(amount, description, null);
+		return await CreateInvoice(amount, description, null, expiry);
 	}
 
 	public async Task<LightningInvoice> CreateInvoice(CreateInvoiceParams createInvoiceRequest, CancellationToken cancellation = new())
@@ -66,7 +54,8 @@ public partial class StrikeLightningClient
 		return await CreateInvoice(
 			createInvoiceRequest.Amount,
 			createInvoiceRequest.Description,
-			createInvoiceRequest.DescriptionHash?.ToString()
+			createInvoiceRequest.DescriptionHash?.ToString(),
+			createInvoiceRequest.Expiry
 			);
 	}
 
@@ -80,52 +69,49 @@ public partial class StrikeLightningClient
 		throw new NotImplementedException();
 	}
 
-	private async Task<LightningInvoice> CreateInvoice(LightMoney amount, string? description, string? descriptionHash)
+	private async Task<LightningInvoice> CreateInvoice(LightMoney amount, string? description, string? descriptionHash, TimeSpan expiry)
 	{
 		var btcAmount = amount.ToUnit(LightMoneyUnit.BTC);
-		var invoiceAmount = new Money { Amount = btcAmount, Currency = Currency.Btc };
-		var invoice = await _client.Invoices.IssueInvoice(new InvoiceReq
+		var requestAmount = new Money { Amount = btcAmount, Currency = Currency.Btc };
+		var request = await _client.ReceiveRequests.Create(new ReceiveRequestReq
 		{
-			Amount = invoiceAmount,
-			Description = ParseDescription(description)
+			TargetCurrency = TargetCurrency,
+			Bolt11 = new Bolt11ReceiveRequestReq
+			{
+				Amount = requestAmount,
+				Description = ParseDescription(description),
+				DescriptionHash = descriptionHash,
+				ExpiryInSeconds = (ulong?)expiry.TotalSeconds
+			}
 		});
-		ThrowOnError(invoice);
+		ThrowOnError(request);
 
-		var quote = await _client.Invoices.IssueQuote(invoice.InvoiceId, new InvoiceQuoteReq
+		var bolt11 = request.Bolt11 ?? throw new InvalidOperationException("Received null BOLT11 from Strike API");
+		var receiveRequestId = request.ReceiveRequestId.ToString();
+
+		var entity = new StrikeReceiveRequest
 		{
-			DescriptionHash = descriptionHash
-		});
-		ThrowOnError(quote);
-
-		var invoiceId = invoice.InvoiceId.ToString();
-		var parsedInvoice = BOLT11PaymentRequest.Parse(quote.LnInvoice, _network);
-
-		var entity = new StrikeQuote
-		{
-			InvoiceId = invoiceId,
-			LightningInvoice = quote.LnInvoice,
-			Description = invoice.Description,
-			CreatedAt = DateTimeOffset.UtcNow,
-			ExpiresAt = parsedInvoice.ExpiryDate,
-			PaymentHash = parsedInvoice.PaymentHash?.ToString() ?? string.Empty,
-			RequestedBtcAmount = amount.ToUnit(LightMoneyUnit.BTC),
-			RealBtcAmount = parsedInvoice.MinimumAmount.ToUnit(LightMoneyUnit.BTC),
-			TargetAmount = invoice.Amount.Amount,
-			TargetCurrency = invoice.Amount.Currency.ToStringUpperInvariant(),
-			ConversionRate = quote.ConversionRate.Amount,
-			ConvertToCurrency = TargetCurrency != Currency.Btc ? TargetCurrency.ToStringUpperInvariant() : null
+			ReceiveRequestId = receiveRequestId,
+			LightningInvoice = bolt11.Invoice,
+			Description = bolt11.Description,
+			CreatedAt = request.Created,
+			ExpiresAt = bolt11.Expires,
+			PaymentHash = bolt11.PaymentHash,
+			RequestedBtcAmount = requestAmount.Amount,
+			RealBtcAmount = bolt11.BtcAmount,
+			TargetCurrency = request.TargetCurrency?.ToStringUpperInvariant() ?? TargetCurrency.ToStringUpperInvariant(),
 		};
 		await using var storage = _db.ResolveStorage();
 		await storage.Store(entity);
 
 		return new LightningInvoice
 		{
-			Id = invoiceId,
-			BOLT11 = quote.LnInvoice,
-			PaymentHash = parsedInvoice.PaymentHash?.ToString(),
-			ExpiresAt = parsedInvoice.ExpiryDate,
-			Amount = parsedInvoice.MinimumAmount,
-			Status = TranslateStatus(invoice.State, parsedInvoice.ExpiryDate)
+			Id = receiveRequestId,
+			BOLT11 = bolt11.Invoice,
+			PaymentHash = bolt11.PaymentHash,
+			ExpiresAt = bolt11.Expires,
+			Amount = new LightMoney(bolt11.BtcAmount, LightMoneyUnit.BTC),
+			Status = LightningInvoiceStatus.Unpaid
 		};
 	}
 
@@ -165,90 +151,41 @@ public partial class StrikeLightningClient
 	private static string? FindValue(string[][] dict, string searchWord) =>
 		dict.FirstOrDefault(x => x.Length > 1 && x[0].Contains(searchWord, StringComparison.OrdinalIgnoreCase))?[1];
 
-	private async Task<LightningInvoice?> ConvertInvoice(Invoice invoice)
+	private static LightningInvoice[] ConvertReceiveRequests(StrikeReceiveRequest[] requests)
 	{
-		try
-		{
-			await using var storage = _db.ResolveStorage();
-			var invoiceId = invoice.InvoiceId.ToString();
-			var quote = await storage.FindQuoteByInvoiceId(invoiceId);
-			if (quote == null)
-				return null;
+		return requests
+			.Select(ConvertReceiveRequest)
+			.ToArray()!;
+	}
 
-			var converted = ConvertInvoice(invoice, quote);
-			if (converted == null)
-				return null;
-
-			var status = TranslateStatus(invoice.State, quote.ExpiresAt);
-			if (status == LightningInvoiceStatus.Paid && !quote.Paid)
-			{
-				quote.Paid = true;
-				await storage.Store(quote);
-			}
-
-			return converted;
-		}
-		catch (Exception e)
-		{
-			_logger.LogWarning(e, "Failed to convert invoice {invoiceId}, error: {errorMessage}", invoice?.InvoiceId, e.Message);
+	private static LightningInvoice? ConvertReceiveRequest(StrikeReceiveRequest? request)
+	{
+		if (request == null)
 			return null;
-		}
+
+		var status = TranslateStatus(request);
+		var amount = new LightMoney(request.RealBtcAmount, LightMoneyUnit.BTC);
+
+		return new LightningInvoice
+		{
+			Id = request.ReceiveRequestId,
+			BOLT11 = request.LightningInvoice,
+			PaymentHash = request.PaymentHash,
+			ExpiresAt = request.ExpiresAt,
+			PaidAt = request.PaidAt,
+			Amount = amount,
+			AmountReceived = request.Paid ? amount : null,
+			Status = status
+		};
 	}
 
-	private LightningInvoice? ConvertInvoice(Invoice invoice, StrikeQuote quote)
+	private static LightningInvoiceStatus TranslateStatus(StrikeReceiveRequest request)
 	{
-		try
-		{
-			var invoiceId = invoice.InvoiceId.ToString();
-			var parsedInvoice = BOLT11PaymentRequest.Parse(quote.LightningInvoice, _network);
-			var status = TranslateStatus(invoice.State, quote.ExpiresAt);
-
-			return new LightningInvoice
-			{
-				Id = invoiceId,
-				BOLT11 = quote.LightningInvoice,
-				PaymentHash = parsedInvoice.PaymentHash?.ToString(),
-				ExpiresAt = parsedInvoice.ExpiryDate,
-				Amount = parsedInvoice.MinimumAmount,
-				AmountReceived = status == LightningInvoiceStatus.Paid ? parsedInvoice.MinimumAmount : null,
-				PaidAt = status == LightningInvoiceStatus.Paid ? DateTimeOffset.UtcNow : null,
-				Status = status
-			};
-		}
-		catch (Exception e)
-		{
-			_logger.LogWarning(e, "Failed to convert invoice {invoiceId}, error: {errorMessage}", invoice?.InvoiceId, e.Message);
-			return null;
-		}
-	}
-
-	private async Task<LightningInvoice[]> ConvertInvoices(InvoicesCollection invoices)
-	{
-		var result = new List<LightningInvoice>();
-		foreach (var invoice in invoices.Items)
-		{
-			var converted = await ConvertInvoice(invoice);
-			if (converted == null)
-				continue;
-			result.Add(converted);
-		}
-		return result.ToArray();
-	}
-
-	private LightningInvoiceStatus TranslateStatus(InvoiceState state, DateTimeOffset expiration)
-	{
-		if (state == InvoiceState.Paid)
+		if (request.Paid)
 			return LightningInvoiceStatus.Paid;
 
-		var now = DateTimeOffset.UtcNow;
-		if (now > expiration)
-			return LightningInvoiceStatus.Expired;
-
-		return state switch
-		{
-			InvoiceState.Unpaid => LightningInvoiceStatus.Unpaid,
-			InvoiceState.Pending => LightningInvoiceStatus.Unpaid,
-			_ => LightningInvoiceStatus.Expired
-		};
+		return request.IsExpired ?
+			LightningInvoiceStatus.Expired :
+			LightningInvoiceStatus.Unpaid;
 	}
 }

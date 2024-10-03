@@ -19,24 +19,35 @@ public class StrikeStorage : IDisposable, IAsyncDisposable
 
 	public string? TenantId { get; set; }
 
-	public async Task<StrikeQuote[]> GetUnobserved(CancellationToken cancellation)
+	public async Task<StrikeReceiveRequest[]> GetUnobserved(CancellationToken cancellation)
 	{
 		ValidateTenantId();
 
-		return await _db.Quotes
+		return await _db.ReceiveRequests
 			.Where(x => x.TenantId == TenantId && !x.Observed)
 			.ToArrayAsync(cancellation);
 	}
 
-	public async Task<StrikeQuote?> FindQuoteByInvoiceId(string invoiceId)
+	public async Task<StrikeReceiveRequest[]> GetReceiveRequests(bool onlyPending, int offset = 0)
 	{
-		return await _db.Quotes
-			.FirstOrDefaultAsync(x => (TenantId == null || x.TenantId == TenantId) && x.InvoiceId == invoiceId);
+		var now = DateTimeOffset.UtcNow;
+		return await _db.ReceiveRequests
+			.Where(x => TenantId == null || x.TenantId == TenantId)
+			.Where(x => onlyPending && !x.Paid && x.ExpiresAt > now)
+			.OrderByDescending(x => x.CreatedAt)
+			.Skip(offset)
+			.ToArrayAsync();
 	}
 
-	public async Task<StrikeQuote?> FindQuoteByPaymentHash(string paymentHash)
+	public async Task<StrikeReceiveRequest?> FindReceiveRequest(string receiveRequestId)
 	{
-		return await _db.Quotes
+		return await _db.ReceiveRequests
+			.FirstOrDefaultAsync(x => (TenantId == null || x.TenantId == TenantId) && x.ReceiveRequestId == receiveRequestId);
+	}
+
+	public async Task<StrikeReceiveRequest?> FindReceiveRequestByPaymentHash(string paymentHash)
+	{
+		return await _db.ReceiveRequests
 			.FirstOrDefaultAsync(x => (TenantId == null || x.TenantId == TenantId) && x.PaymentHash == paymentHash);
 	}
 
@@ -76,6 +87,19 @@ public class StrikeStorage : IDisposable, IAsyncDisposable
 		catch (Exception e)
 		{
 			_logger.LogError(e, "Failed to store entity into the DB, error: {error} / {inner}", e.Message, e.InnerException?.Message);
+			throw;
+		}
+	}
+
+	public async Task Store()
+	{
+		try
+		{
+			await _db.SaveChangesAsync();
+		}
+		catch (Exception e)
+		{
+			_logger.LogError(e, "Failed to store entities into the DB, error: {error} / {inner}", e.Message, e.InnerException?.Message);
 			throw;
 		}
 	}

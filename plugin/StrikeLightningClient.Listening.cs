@@ -5,9 +5,11 @@ using System.Threading;
 using System.Threading.Tasks;
 using BTCPayServer.Lightning;
 using BTCPayServer.Plugins.Strike.Persistence;
+using ExchangeSharp;
 using Microsoft.Extensions.Logging;
 using NBXplorer;
-using Strike.Client.Invoices;
+using Strike.Client.Models;
+using Strike.Client.ReceiveRequests;
 
 namespace BTCPayServer.Plugins.Strike;
 
@@ -67,16 +69,15 @@ public partial class StrikeLightningClient
 			foreach (var invoice in _completedToBeReported.ToArray())
 			{
 				await using var storage = _client._db.ResolveStorage();
-				var quote = await storage.FindQuoteByInvoiceId(invoice.Id);
-				if (quote == null)
+				var request = await storage.FindReceiveRequest(invoice.Id);
+				if (request == null)
 				{
 					_completedToBeReported.Remove(invoice);
 					continue;
 				}
 
-				quote.Paid = invoice.Status == LightningInvoiceStatus.Paid;
-				quote.Observed = true;
-				await storage.Store(quote);
+				request.Observed = true;
+				await storage.Store(request);
 
 				_completedToBeReported.Remove(invoice);
 				return invoice;
@@ -98,43 +99,98 @@ public partial class StrikeLightningClient
 			if (unobserved.Length == 0)
 				return Array.Empty<LightningInvoice>();
 
-			var invoices = await QueryStrikeApi(unobserved);
-			var converted = ConvertToBtcPayFormat(invoices, unobserved).ToArray();
+			var receives = await QueryStrikeApi(unobserved);
+			var converted = ConvertToBtcPayFormat(receives, unobserved).ToArray();
 			var completed = converted
-				.Where(x => x.Status != LightningInvoiceStatus.Unpaid)
+				.Where(x => x != null && x.Status != LightningInvoiceStatus.Unpaid)
 				.ToArray();
-			return completed;
+
+			await storage.Store();
+			return completed!;
 		}
 
-		private IEnumerable<LightningInvoice> ConvertToBtcPayFormat(Invoice[] invoices, StrikeQuote[] unobserved)
+		private static IEnumerable<LightningInvoice?> ConvertToBtcPayFormat(Receive[] receives, StrikeReceiveRequest[] unobserved)
 		{
-			foreach (var invoice in invoices)
+			foreach (var request in unobserved)
 			{
-				var quote = unobserved.FirstOrDefault(x => x.InvoiceId == invoice.InvoiceId.ToString());
-				if (quote == null)
-					continue;
-				var converted = _client.ConvertInvoice(invoice, quote);
-				if (converted == null)
-					continue;
-
-				yield return converted;
+				var receive = receives.FirstOrDefault(x => x.ReceiveRequestId.ToString() == request.ReceiveRequestId);
+				if (receive != null && receive.State == ReceiveState.Completed)
+					yield return ConvertAndUpdateReceive(receive, request);
+				if (request.IsExpired)
+					yield return ConvertReceiveRequest(request);
 			}
 		}
 
-		private async Task<Invoice[]> QueryStrikeApi(StrikeQuote[] unobserved)
+		private static LightningInvoice ConvertAndUpdateReceive(Receive receive, StrikeReceiveRequest request)
+		{
+			var status = TranslateStatus(receive, request);
+			var amount = receive.AmountReceived.Currency == Currency.Btc ?
+				new LightMoney(receive.AmountReceived.Amount, LightMoneyUnit.BTC) :
+				new LightMoney(request.RealBtcAmount, LightMoneyUnit.BTC);
+
+			UpdateRequest(request, receive);
+
+			return new LightningInvoice
+			{
+				Id = request.ReceiveRequestId,
+				BOLT11 = receive.Lightning?.Invoice,
+				PaymentHash = receive.Lightning?.PaymentHash,
+				Preimage = receive.Lightning?.Preimage,
+				PaidAt = receive.Completed,
+				ExpiresAt = request.ExpiresAt,
+				Amount = amount,
+				AmountReceived = amount,
+				Status = status
+			};
+		}
+
+		private static void UpdateRequest(StrikeReceiveRequest request, Receive receive)
+		{
+			if (receive.State != ReceiveState.Completed)
+				return;
+
+			request.Paid = true;
+			request.PaidAt = receive.Completed;
+			request.ConversionRate = receive.ConversionRate?.Amount;
+			request.PaymentPreimage = receive.Lightning?.Preimage;
+			request.PaymentCounterpartyId = receive.P2P?.PayerAccountId.ToString();
+
+			if (receive.AmountCredited != null)
+			{
+				request.TargetAmount = receive.AmountCredited.Amount;
+				request.TargetCurrency = receive.AmountCredited.Currency.ToStringUpperInvariant();
+			}
+		}
+
+		private async Task<Receive[]> QueryStrikeApi(StrikeReceiveRequest[] unobserved)
 		{
 			var bulks = unobserved.Batch(100);
-			var invoices = new List<Invoice>();
+			var receives = new List<Receive>();
 
 			foreach (var bulk in bulks)
 			{
-				var ids = bulk.Select(x => Guid.Parse(x.InvoiceId)).ToArray();
-				var filter = $"{nameof(Invoice.InvoiceId)} in ({string.Join(',', ids)})";
-				var collection = await _client._client.Invoices.GetInvoices(filter);
-				invoices.AddRange(collection.Items);
+				var requestIds = bulk.Select(x => Guid.Parse(x.ReceiveRequestId)).ToArray();
+				var collection = await _client._client.ReceiveRequests.GetReceives(receiveRequestId: requestIds);
+				receives.AddRange(collection.Items);
 			}
 
-			return invoices.ToArray();
+			return receives.ToArray();
+		}
+
+		private static LightningInvoiceStatus TranslateStatus(Receive receive, StrikeReceiveRequest request)
+		{
+			if (receive.State == ReceiveState.Completed)
+				return LightningInvoiceStatus.Paid;
+
+			if (request.IsExpired)
+				return LightningInvoiceStatus.Expired;
+
+			return receive.State switch
+			{
+				ReceiveState.Pending => LightningInvoiceStatus.Unpaid,
+				ReceiveState.Undefined => LightningInvoiceStatus.Unpaid,
+				_ => LightningInvoiceStatus.Expired
+			};
 		}
 	}
 }

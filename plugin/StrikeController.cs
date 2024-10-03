@@ -18,13 +18,16 @@ public class StrikeController : Controller
 	private readonly BTCPayNetworkProvider _btcPayNetworkProvider;
 	private readonly BTCPayWalletProvider _btcWalletProvider;
 	private readonly StoreRepository _storeRepository;
+	private readonly StrikeLightningConnectionStringHandler _strikeHandler;
 
 	public StrikeController(BTCPayNetworkProvider btcPayNetworkProvider,
-		BTCPayWalletProvider btcWalletProvider, StoreRepository storeRepository)
+		BTCPayWalletProvider btcWalletProvider, StoreRepository storeRepository,
+		StrikeLightningConnectionStringHandler strikeHandler)
 	{
 		_btcPayNetworkProvider = btcPayNetworkProvider;
 		_btcWalletProvider = btcWalletProvider;
 		_storeRepository = storeRepository;
+		_strikeHandler = strikeHandler;
 	}
 
 
@@ -45,6 +48,7 @@ public class StrikeController : Controller
 	[HttpGet("configure")]
 	public IActionResult Configure(string storeId)
 	{
+		var store = HttpContext.GetStoreData();
 		return View();
 	}
 
@@ -52,11 +56,6 @@ public class StrikeController : Controller
 	[Authorize(Policy = Policies.CanModifyStoreSettings, AuthenticationSchemes = AuthenticationSchemes.Cookie)]
 	public IActionResult Configure(string storeId, string command, string settings)
 	{
-		var store = HttpContext.GetStoreData();
-		var existing = store.GetSupportedPaymentMethods(_btcPayNetworkProvider).OfType<LightningSupportedPaymentMethod>()
-			.FirstOrDefault(method =>
-				method.PaymentId.PaymentType == LightningPaymentType.Instance &&
-				method.PaymentId.CryptoCode == "BTC");
 
 		return RedirectToAction(nameof(Configure), new { storeId });
 	}

@@ -26,6 +26,7 @@ internal class StrikeDbContextMigrator : IHostedService
 			await using var ctx = _dbContextFactory.CreateContext();
 			await using var dbContext = _dbContextFactory.CreateContext();
 			await ctx.Database.MigrateAsync(cancellationToken);
+			_logger.LogInformation("Strike database migrated successfully");
 		}
 		catch (Exception e)
 		{

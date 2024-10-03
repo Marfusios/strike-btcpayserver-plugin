@@ -26,6 +26,7 @@ public partial class StrikeLightningClient
 		var payment = await _client.Payments.FindPayment(Guid.Parse(found.PaymentId));
 		if (payment.StatusCode == HttpStatusCode.NotFound)
 			return null;
+		ThrowOnError(payment);
 
 		var status = TranslateLightningPayStatus(payment.State);
 		var realLnAmount = new LightMoney(found.RequestedBtcAmount, LightMoneyUnit.BTC);
@@ -144,7 +145,7 @@ public partial class StrikeLightningClient
 		return Pay(bolt11, null, cancellation);
 	}
 
-	private LightMoney ConvertAmount(Money? amount)
+	private static LightMoney ConvertAmount(Money? amount)
 	{
 		if (amount == null)
 			return LightMoney.Zero;
@@ -165,12 +166,12 @@ public partial class StrikeLightningClient
 		};
 	}
 
-	private string FormatError(HttpStatusCode status, StrikeError? error)
+	private static string FormatError(HttpStatusCode status, StrikeError? error)
 	{
 		return $"HTTP: {(int)status}, code: {error?.Data?.Code} {error?.Data?.Message}";
 	}
 
-	private PayResult TranslatePayStatus(PaymentState state) =>
+	private static PayResult TranslatePayStatus(PaymentState state) =>
 		state switch
 		{
 			PaymentState.Completed => PayResult.Ok,
@@ -179,7 +180,7 @@ public partial class StrikeLightningClient
 			_ => PayResult.Unknown
 		};
 
-	private LightningPaymentStatus TranslateLightningPayStatus(PaymentState state) =>
+	private static LightningPaymentStatus TranslateLightningPayStatus(PaymentState state) =>
 		state switch
 		{
 			PaymentState.Completed => LightningPaymentStatus.Complete,

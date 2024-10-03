@@ -3,23 +3,27 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace BTCPayServer.Plugins.Strike.Persistence;
-public class StrikeQuote : IHasTenantId
+public class StrikeReceiveRequest : IHasTenantId
 {
 	public long Id { get; init; }
 
-	public string TenantId { get; set; } = string.Empty;
+	public string ReceiveRequestId { get; init; } = string.Empty;
 
-	public string InvoiceId { get; init; } = string.Empty;
+	public string TenantId { get; set; } = string.Empty;
 
 	public string LightningInvoice { get; init; } = string.Empty;
 
 	public string PaymentHash { get; init; } = string.Empty;
+	public string? PaymentPreimage { get; set; }
+	public string? PaymentCounterpartyId { get; set; }
 
 	public string? Description { get; init; }
 
 	public DateTimeOffset CreatedAt { get; init; }
 
 	public DateTimeOffset ExpiresAt { get; init; }
+
+	public DateTimeOffset? PaidAt { get; set; }
 
 	/// <summary>
 	/// BTC amount requested by BTCPayServer
@@ -34,27 +38,17 @@ public class StrikeQuote : IHasTenantId
 	/// <summary>
 	/// Target amount to be received on Strike, can be fiat or BTC
 	/// </summary>
-	public decimal TargetAmount { get; init; }
+	public decimal? TargetAmount { get; set; }
 
 	/// <summary>
 	/// Target currency to be received on Strike, can be fiat or BTC
 	/// </summary>
-	public string TargetCurrency { get; init; } = string.Empty;
-
-	/// <summary>
-	/// The target currency to convert this quote after the payment is paid
-	/// </summary>
-	public string? ConvertToCurrency { get; init; }
-
-	/// <summary>
-	/// Whether the quote has been converted to the 'ConvertToCurrency' (only if not null)
-	/// </summary>
-	public bool Converted { get; set; }
+	public string TargetCurrency { get; set; } = string.Empty;
 
 	/// <summary>
 	/// Conversion rate in case the target amount is in fiat
 	/// </summary>
-	public decimal ConversionRate { get; init; }
+	public decimal? ConversionRate { get; set; }
 
 	public bool Paid { get; set; }
 
@@ -63,30 +57,38 @@ public class StrikeQuote : IHasTenantId
 	public bool IsExpired => !Paid && ExpiresAt < DateTimeOffset.UtcNow;
 }
 
-public class StrikeQuoteConfiguration : IEntityTypeConfiguration<StrikeQuote>
+public class StrikeReceiveRequestConfiguration : IEntityTypeConfiguration<StrikeReceiveRequest>
 {
-	public void Configure(EntityTypeBuilder<StrikeQuote> builder)
+	public void Configure(EntityTypeBuilder<StrikeReceiveRequest> builder)
 	{
-		builder.ToTable("Quotes");
+		builder.ToTable("ReceiveRequests");
 		builder.Property(x => x.Id).ValueGeneratedOnAdd();
 		builder.HasKey(x => x.Id);
 
 		builder.Property(x => x.TenantId).HasMaxLength(300);
-		builder.Property(x => x.InvoiceId).HasMaxLength(300);
+		builder.Property(x => x.ReceiveRequestId).HasMaxLength(300);
 		builder.Property(x => x.LightningInvoice).HasMaxLength(1000);
 		builder.Property(x => x.PaymentHash).HasMaxLength(300);
+		builder.Property(x => x.PaymentPreimage).HasMaxLength(1000);
+		builder.Property(x => x.PaymentCounterpartyId).HasMaxLength(300);
 		builder.Property(x => x.Description).HasMaxLength(1000);
 
 		builder.Property(x => x.RequestedBtcAmount);
 		builder.Property(x => x.RealBtcAmount);
 		builder.Property(x => x.TargetAmount);
 		builder.Property(x => x.TargetCurrency).HasMaxLength(10);
-		builder.Property(x => x.ConvertToCurrency).HasMaxLength(10);
 		builder.Property(x => x.ConversionRate);
 
 		builder.Property(x => x.CreatedAt);
 		builder.Property(x => x.ExpiresAt);
+		builder.Property(x => x.PaidAt);
 		builder.Property(x => x.Paid);
 		builder.Property(x => x.Observed);
+
+		builder.HasIndex(x => x.TenantId);
+		builder.HasIndex(x => x.ReceiveRequestId);
+		builder.HasIndex(x => x.PaymentHash);
+		builder.HasIndex(x => x.CreatedAt);
+		builder.HasIndex(x => x.PaidAt);
 	}
 }

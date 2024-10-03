@@ -8,7 +8,6 @@ using ExchangeSharp;
 using Microsoft.Extensions.Logging;
 using NBitcoin;
 using Strike.Client;
-using Strike.Client.CurrencyExchanges;
 using Strike.Client.Errors;
 using Strike.Client.Models;
 
@@ -33,6 +32,8 @@ public partial class StrikeLightningClient : ILightningClient
 
 	public Currency TargetCurrency { get; }
 
+	public StrikeClient Client => _client;
+
 	public override string ToString()
 	{
 		var currency = TargetCurrency.ToStringUpperInvariant();
@@ -48,36 +49,30 @@ public partial class StrikeLightningClient : ILightningClient
 
 	public async Task<LightningNodeBalance> GetBalance(CancellationToken cancellation = new())
 	{
-		var rates = await _client.Rates.GetRatesTicker();
-		ThrowOnError(rates);
-
 		var balances = await _client.Balances.GetBalances();
-		ThrowOnError(balances);
+		if (!balances.IsSuccessStatusCode)
+			return BalanceResult(0);
 
-		var totalAvailableBtcBalance = 0m;
+		var balance = balances.FirstOrDefault(x => x.Currency == TargetCurrency)?.Available ?? 0;
+		if (TargetCurrency == Currency.Btc)
+			return BalanceResult(balance);
 
-		foreach (var balance in balances)
-		{
-			if (balance.Currency == Currency.Btc)
-			{
-				totalAvailableBtcBalance += balance.Available;
-				continue;
-			}
 
-			var foundRate = rates
-				.FirstOrDefault(x => x.TargetCurrency == balance.Currency && x.SourceCurrency == Currency.Btc);
-			if (foundRate is not { Amount: > 0 })
-				continue;
+		var rates = await _client.Rates.GetRatesTicker();
+		if (!rates.IsSuccessStatusCode)
+			return BalanceResult(0);
 
-			totalAvailableBtcBalance += Math.Round(balance.Available / foundRate.Amount, 8);
-		}
+		var foundRate = rates
+			.FirstOrDefault(x => x.TargetCurrency == TargetCurrency && x.SourceCurrency == Currency.Btc);
+		if (foundRate is not { Amount: > 0 })
+			return BalanceResult(0);
 
-		return new LightningNodeBalance(
-			new OnchainBalance(),
-			new OffchainBalance
-			{
-				Local = new LightMoney(totalAvailableBtcBalance, LightMoneyUnit.BTC)
-			}
+		return BalanceResult(Math.Round(balance / foundRate.Amount, 8));
+
+		static LightningNodeBalance BalanceResult(decimal balance1) =>
+			new(
+				new OnchainBalance(),
+				new OffchainBalance { Local = new LightMoney(balance1, LightMoneyUnit.BTC) }
 			);
 	}
 
@@ -96,36 +91,13 @@ public partial class StrikeLightningClient : ILightningClient
 		throw new NotImplementedException();
 	}
 
-	public async Task<bool> ConvertAmount(Currency from, Currency to, decimal amountFrom, Guid idempotencyKey)
-	{
-		var req = new CurrencyExchangeQuoteReq
-		{
-			Sell = from,
-			Buy = to,
-			Amount = new MoneyWithFee
-			{
-				Currency = from,
-				Amount = amountFrom,
-				FeePolicy = FeePolicy.Exclusive
-			},
-			IdempotencyKey = idempotencyKey
-		};
-		var quote = await _client.CurrencyExchanges.CreateQuote(req);
-		if (quote.Error?.Data.Code == "DUPLICATE_CURRENCY_EXCHANGE_QUOTE")
-			return true;
-		ThrowOnError(quote);
-		var response = await _client.CurrencyExchanges.ExecuteQuote(quote.Id);
-		return response.IsSuccessStatusCode;
-	}
-
 	private void ThrowOnError(ResponseBase response)
 	{
-		if (!response.IsSuccessStatusCode)
-		{
-			var error = response.Error?.Data;
-			throw new StrikeApiException(
+		if (response.IsSuccessStatusCode)
+			return;
+		var error = response.Error?.Data;
+		throw new StrikeApiException(
 			$"API error, status: {response.StatusCode}, error: {error?.Code} {error?.Message}");
-		}
 
 	}
 }

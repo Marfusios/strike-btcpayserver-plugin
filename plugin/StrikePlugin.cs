@@ -4,7 +4,6 @@ using BTCPayServer.Abstractions.Services;
 using BTCPayServer.Lightning;
 using BTCPayServer.Plugins.Strike.Persistence;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using Strike.Client;
 
 namespace BTCPayServer.Plugins.Strike;
@@ -21,6 +20,7 @@ public class StrikePlugin : BaseBTCPayServerPlugin
 	{
 		applicationBuilder.AddSingleton<IUIExtension>(new UIExtension("Strike/LNPaymentMethodSetupTab", "ln-payment-method-setup-tab"));
 		applicationBuilder.AddSingleton<IUIExtension>(new UIExtension("Strike/StrikeNav", "store-integrations-nav"));
+		applicationBuilder.AddSingleton<IUIExtension>(new UIExtension("Strike/StrikeBalances", "dashboard"));
 
 		applicationBuilder.AddSingleton<ILightningConnectionStringHandler>(provider => provider.GetRequiredService<StrikeLightningConnectionStringHandler>());
 		applicationBuilder.AddSingleton<StrikeLightningConnectionStringHandler>();
@@ -36,12 +36,10 @@ public class StrikePlugin : BaseBTCPayServerPlugin
 
 		applicationBuilder.AddTransient<StrikeStorageFactory>();
 		applicationBuilder.AddTransient<StrikeStorage>();
+		applicationBuilder.AddTransient<StrikeClientFinder>();
 
 		applicationBuilder.AddStrikeHttpClient();
 		applicationBuilder.AddStrikeClient();
-
-		applicationBuilder.AddSingleton<StrikePluginHostedService>();
-		applicationBuilder.AddSingleton<IHostedService>(provider => provider.GetRequiredService<StrikePluginHostedService>());
 
 		base.Execute(applicationBuilder);
 	}

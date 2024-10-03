@@ -16,7 +16,7 @@ It allows using [Strike Wallet](https://strike.me) account as the lightning prov
 
 ### Usage
 
-- Visit [Strike Dashboard](https://dashboard.strike.me/login) and obtain API key. Select all scopes under **Account**, **Receiving payments**, **Currency exchange** and **Rates**.
+- Visit [Strike Dashboard](https://dashboard.strike.me/login) and obtain API key. Select all scopes under **Account**, **Receive Requests** and **Rates**.
 - Optionally select scopes under **Sending payments** to enable payments triggered by BTCPayServer (payouts, BOLT cards, etc.) 
 
 > :warning: **Owner of this BTCPayServer instance can access your API key.** 
