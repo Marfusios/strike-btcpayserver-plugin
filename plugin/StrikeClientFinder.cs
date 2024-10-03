@@ -6,7 +6,7 @@ using BTCPayServer.Payments.Lightning;
 using Strike.Client;
 
 namespace BTCPayServer.Plugins.Strike;
-internal class StrikeClientFinder
+public class StrikeClientFinder
 {
 	private readonly BTCPayNetworkProvider _btcPayNetworkProvider;
 	private readonly StrikeLightningConnectionStringHandler _strikeHandler;
