@@ -8,9 +8,7 @@
 	<!-- Plugin specific properties -->
 	<PropertyGroup>
 		<Product>Strike</Product>
-		<Description>Strike as a lightning provider. 
-			IMPORTANT! Upgrading from v1.2 requires to regenerate API keys (select new 'receive requests' scopes)
-		</Description>
+		<Description>Strike as a lightning provider. IMPORTANT! Upgrading from v1.2 requires to regenerate API keys (select new 'receive requests' scopes)</Description>
 		<Version>1.3.2</Version>
 		<CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
 		<RootNamespace>BTCPayServer.Plugins.Strike</RootNamespace>
