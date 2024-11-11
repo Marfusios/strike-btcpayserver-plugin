@@ -1,8 +1,8 @@
 ﻿using System;
-using System.Linq;
 using BTCPayServer.Data;
 using BTCPayServer.Payments;
 using BTCPayServer.Payments.Lightning;
+using BTCPayServer.Services.Invoices;
 using Strike.Client;
 
 namespace BTCPayServer.Plugins.Strike;
@@ -10,11 +10,13 @@ public class StrikeClientFinder
 {
 	private readonly BTCPayNetworkProvider _btcPayNetworkProvider;
 	private readonly StrikeLightningConnectionStringHandler _strikeHandler;
+	private readonly PaymentMethodHandlerDictionary _paymentMethods;
 
-	public StrikeClientFinder(BTCPayNetworkProvider btcPayNetworkProvider, StrikeLightningConnectionStringHandler strikeHandler)
+	public StrikeClientFinder(BTCPayNetworkProvider btcPayNetworkProvider, StrikeLightningConnectionStringHandler strikeHandler, PaymentMethodHandlerDictionary paymentMethods)
 	{
 		_btcPayNetworkProvider = btcPayNetworkProvider;
 		_strikeHandler = strikeHandler;
+		_paymentMethods = paymentMethods;
 	}
 
 
@@ -43,10 +45,9 @@ public class StrikeClientFinder
 
 		var btcCode = "BTC";
 		var network = _btcPayNetworkProvider.GetNetwork<BTCPayNetwork>(btcCode);
-		var existing = store.GetSupportedPaymentMethods(_btcPayNetworkProvider).OfType<LightningSupportedPaymentMethod>()
-			.FirstOrDefault(method =>
-				method.PaymentId.PaymentType == LightningPaymentType.Instance &&
-				method.PaymentId.CryptoCode == btcCode);
+		var pmi = PaymentTypes.LN.GetPaymentMethodId(btcCode);
+		var existing = store.GetPaymentMethodConfig<LightningPaymentMethodConfig>(pmi, _paymentMethods);
+
 		if (existing == null)
 		{
 			error = "Lightning payment method is not configured";

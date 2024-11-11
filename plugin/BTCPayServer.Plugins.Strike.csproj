@@ -8,8 +8,8 @@
 	<!-- Plugin specific properties -->
 	<PropertyGroup>
 		<Product>Strike</Product>
-		<Description>Strike as a lightning provider. IMPORTANT! Upgrading from v1.2 requires to regenerate API keys (select new 'receive requests' scopes)</Description>
-		<Version>1.3.2</Version>
+		<Description>Strike as a lightning provider. Supports BTCPayServer v2. IMPORTANT! Upgrading from v1.2 requires to regenerate API keys (select new 'receive requests' scopes)</Description>
+		<Version>1.4.0</Version>
 		<CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
 		<RootNamespace>BTCPayServer.Plugins.Strike</RootNamespace>
 	</PropertyGroup>
@@ -34,7 +34,7 @@
 	<ItemGroup>
 		<EmbeddedResource Include="Resources\**" />
 		<ProjectReference Include="..\submodules\btcpayserver\BTCPayServer\BTCPayServer.csproj" />
-		<PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="8.0.0" />
+		<PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="8.0.4" />
 		<PackageReference Include="StrikeWallet.Client" Version="1.2.3" />
 		<PackageReference Include="Westwind.AspNetCore.Markdown" Version="3.21.0" />
 	</ItemGroup>
@@ -46,8 +46,8 @@
 
 
 	<ItemGroup Condition="$(Configuration) != 'Release'">
-		<PackageReference Include="Microsoft.CodeAnalysis.Common" Version="4.9.2" />
-		<PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.9.2" />
+		<PackageReference Include="Microsoft.CodeAnalysis.Common" Version="4.10.0" />
+		<PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.10.0" />
 		<PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.6">
 			<PrivateAssets>all</PrivateAssets>
 			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>

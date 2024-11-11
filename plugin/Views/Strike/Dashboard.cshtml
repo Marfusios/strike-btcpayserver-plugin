@@ -28,7 +28,8 @@
 }
 
 @{
-	ViewData.SetActivePage("Strike", "Strike Dashboard", "Dashboard");
+    Layout = "./_StrikeLayout";
+    ViewData.SetActivePage("Strike", "Strike Dashboard", "Dashboard");
     var storeId = Model switch
     {
         string s => s,
