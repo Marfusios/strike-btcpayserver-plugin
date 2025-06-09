@@ -1,5 +1,6 @@
 ![Logo](strike_wide.png)
 # Strike BTCPayServer Plugin
+[![CI build](https://img.shields.io/github/check-runs/marfusios/strike-btcpayserver-plugin/master?style=flat-square&label=build)](https://github.com/Marfusios/strike-btcpayserver-plugin/actions/workflows/dotnet-core.yml)
 
 It allows using [Strike Wallet](https://strike.me) account as the lightning provider for the BTCPay Server.
 

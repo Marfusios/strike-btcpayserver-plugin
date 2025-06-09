@@ -90,6 +90,7 @@ public class StrikeLightningConnectionStringHandler : ILightningConnectionString
 		client.ApiKey = apiKey;
 		client.Environment = environment;
 		client.ThrowOnError = false;
+		client.ShowRawJson = false;
 
 		if (serverUrl != null)
 			client.ServerUrl = serverUrl;
@@ -110,9 +111,6 @@ public class StrikeLightningConnectionStringHandler : ILightningConnectionString
 			error = "The key 'currency' is invalid, set either 'BTC', 'FIAT' or 'USD'/'EUR'";
 			return null;
 		}
-
-		// recompute tenantId with the real currency
-		tenantId = Lookup.ComputeTenantId(apiKey, targetOperatingCurrency.ToString());
 
 		var db = _serviceProvider.GetRequiredService<StrikeStorageFactory>();
 		db.TenantId = tenantId;
